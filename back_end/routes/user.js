@@ -3,7 +3,6 @@ const router = express.Router();
 const pool = require('../connect_db');
 
 router.get('/', (req, res, next) => {
-    console.log(req);
     const userID = req.query.userid;
 
     let sql = 'SELECT * FROM user WHERE 1';
@@ -119,19 +118,21 @@ router.put('/updateUser/:userId', (req, res) => {
 
 // Delete a user
 router.delete('/deleteUser/:userId', (req, res) => {
-  const userId = req.params.userId;
+    //print(req);
 
-  const sql = 'DELETE FROM user WHERE UserID = ?';
-  pool.query(sql, [userId], (err, result) => {
-    if (err) {
-      console.error('Error deleting user:', err);
-      return res.status(500).send({ error: 'Failed to delete user' });
-    }
-    if (result.affectedRows === 0) {
-      return res.status(404).send({ error: 'User not found' });
-    }
-    res.status(200).send({ message: 'User deleted successfully' });
-  });
+    const userId = req.params.userId;
+
+    const sql = 'DELETE FROM user WHERE UserID = ?';
+    pool.query(sql, [userId], (err, result) => {
+        if (err) {
+            console.error('Error deleting user:', err);
+            return res.status(500).send({ error: 'Failed to delete user' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).send({ error: 'User not found' });
+        }
+        res.status(200).send({ message: 'User deleted successfully' });
+    });
 });
 
 module.exports = router;

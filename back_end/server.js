@@ -3,7 +3,6 @@ const cors = require('cors');
 const app = express();
 const port = 3000;
 
-
 app.use(cors());            // 啟用 CORS，允許來自任何來源的請求
 app.use(express.json());    // 設置 JSON body 解析中介軟體，處理 application/json 格式的請求
 

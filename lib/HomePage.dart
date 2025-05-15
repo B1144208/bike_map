@@ -3,11 +3,19 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // 連接頁面
 import 'LoginPage.dart';
 import 'UserPage.dart';
 import 'LoginPage.dart';
+
+Future<bool> IsLogin() async{
+  final prefs = await SharedPreferences.getInstance();
+  final exists = prefs.getInt('UserID');
+  if(exists != null) return true;
+  else return false;
+}
 
 class HomePage extends StatefulWidget{
   const HomePage({super.key});
@@ -26,7 +34,7 @@ class _HomePageState extends State<HomePage>{
   int? selectedTown;                            // 儲存選擇的 townID
   bool isLoadingCities = true;                  // 是否正在加載 city 資料
   bool isLoadingTowns = false;                  // 是否正在加載 town 資料
-  bool isLoadingYoubikes = false;               // 是否正在加載 youbike 資料
+  bool isLoadingYoubikes = false;               // 是否正在加載 youbadike 資料
 
   final mapController = MapController();
   
@@ -134,6 +142,22 @@ class _HomePageState extends State<HomePage>{
     }
   }
 
+  // 收藏
+  bool isFavorited = false;
+  void toggleFavorite() {
+    setState(() {
+      isFavorited = !isFavorited;
+      // 這裡可以放加入收藏的業務邏輯
+      if (isFavorited) {
+        print('已加入收藏');
+        // TODO: 加入資料庫或 SharedPreferences 收藏紀錄
+      } else {
+        print('取消收藏');
+        // TODO: 移除收藏紀錄
+      }
+    });
+  }
+
   // 初始化
   @override
   void initState() {
@@ -157,10 +181,43 @@ class _HomePageState extends State<HomePage>{
                 // 收藏按鈕，放置在左側
                 InkWell(
                   onTap: (){
+
+                    Future<bool> isLog = IsLogin();
+                    isLog.then((islog){
+                      if(islog){
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => UserPage()),
+                        );
+                      }else{
+                        // 跳出提示框要求登入
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text('提示'),
+                              content: const Text('請先登入帳號再繼續'),
+                            );
+                          },
+                        );
+
+                        // 1秒後自動關閉對話框並跳轉到登入頁
+                        Future.delayed(const Duration(seconds: 1), () {
+                          Navigator.of(context).pop(); // 關閉提示框
+                          Navigator.of(context).pop(); // pop 我的收藏 context
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => LoginPage()),
+                          );
+                        });
+                      }
+                    });
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => UserPage()),
                     );
+
                   },
                   child: Container(
                     width: 60,
@@ -258,6 +315,7 @@ class _HomePageState extends State<HomePage>{
 
             // 地圖渲染
             Expanded(
+              // youbike渲染
               child: isLoadingYoubikes
                 ? const Center(child: CircularProgressIndicator())
                 : FlutterMap(
@@ -299,6 +357,19 @@ class _HomePageState extends State<HomePage>{
                                       '站點 : ${youbikePoint['Name']}\n'
                                     ),
                                     actions: [
+                                      Positioned(
+                                        bottom: 20,
+                                        
+                                        child: FloatingActionButton(
+                                          onPressed: toggleFavorite,
+                                          backgroundColor: isFavorited ? Colors.red : Colors.grey,
+                                          child: Icon(
+                                            isFavorited ? Icons.favorite : Icons.favorite_border,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+
                                       TextButton(
                                         onPressed: () => Navigator.of(context).pop(),
                                         child: const Text('關閉'),
@@ -316,8 +387,60 @@ class _HomePageState extends State<HomePage>{
                           );
                         }).toList(),
                       ),
-
+                      
+                      // cyclingroute 的起始點
                       MarkerLayer(
+                        markers: cyclingrouteslatlng.asMap().map((routeIndex, route) {
+                          return MapEntry(
+                            routeIndex,
+                            [
+                              Marker(
+                                point: route[0],  // 只用第一個 LatLng 點
+                                width: 60,
+                                height: 60,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (BuildContext context) => AlertDialog(
+                                        title: Text("路線詳細資料"),
+                                        content: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min, // 避免內容超出範圍
+                                          children: [
+                                            Text('路線名稱: ${cyclingroutesdata[routeIndex]['Name']}'),
+                                            Text('起點: ${cyclingroutesdata[routeIndex]['Start']}'),
+                                            Text('終點: ${cyclingroutesdata[routeIndex]['End']}'),
+                                            Text('長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺'),
+                                            Text('完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}'),
+                                            Text('管理單位: ${cyclingroutesdata[routeIndex]['Management']}'),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(context).pop(),
+                                            child: Text("關閉"),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                  child: Opacity(
+                                    opacity: 1.0, // 完全透明
+                                    child: const Icon(
+                                      Icons.location_on,
+                                      color: Colors.blue,
+                                      size: 30,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            ],
+                          );
+                        }).values.expand((element) => element).toList(),
+                      ),
+                      // 全部的 cyclingroute 點
+                      /*MarkerLayer(
                         markers: cyclingrouteslatlng.asMap().map((routeIndex, route) {
                           return MapEntry(
                             routeIndex,
@@ -365,7 +488,7 @@ class _HomePageState extends State<HomePage>{
                             }).toList(),
                           );
                         }).values.expand((element) => element).toList(),
-                      ),
+                      ),*/
 
                       PolylineLayer(
                         polylines:
