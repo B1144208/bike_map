@@ -1,0 +1,5 @@
+flask==2.3.3
+flask-mysqldb==1.0.1
+mysql-connector-python==8.3.0
+selenium==4.20.0
+beautifulsoup4==4.12.3
