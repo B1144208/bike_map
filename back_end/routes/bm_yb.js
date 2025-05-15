@@ -1,0 +1,45 @@
+const express = require('express');
+const router = express.Router();
+const pool = require('../connect_db');
+
+router.get('/', (req, res, next) => {
+    const userID = req.query.userid;
+    const ybID = req.query.ybid;
+
+    let sql = 'SELECT * FROM bookmark_youbike WHERE 1';
+    let params = [];
+    if(userID && ybID){
+        sql = 'SELECT * FROM bookmark_youbike WHERE UserID=? AND YBID=?';
+        params = [userID, ybID];
+    }
+
+    pool.query(sql, params, (err, result) => {
+        if (err) {
+            console.log(err);
+            return next(err);
+        }
+        res.json(result);
+    })
+});
+
+
+router.post('/insertBMYB', (req, res) => {
+
+    const { UserID, YBID } = req.body;
+
+    if (!UserID || !YBID) {
+        return res.status(400).send({ error: 'UserID and YBID are required' });
+    }
+
+    let sql = 'INSERT INTO bookmark_youbike (UserID, YBID) VALUES (?, ?)';
+    let param = [UserID, YBID];
+    pool.query(sql, param, (err, result) => {
+        if (err) {
+            console.error('Error inserting bookmark_youbike:', err);
+            return res.status(500).send({ error: 'Failed to insert bookmark_youbike' });
+        }
+        res.status(201).send({ message: 'bookmark_youbike added successfully', BMYBID: result.insertId });
+    });
+});
+
+module.exports = router;

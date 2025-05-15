@@ -5,8 +5,8 @@ import 'dart:convert';
 // 連接頁面
 import 'LoginPage.dart';
 
-Future<bool> addUser(String account, String password) async{
-  final url = 'http://localhost:3000/user/addUser';
+Future<bool> insertUser(String account, String password) async{
+  final url = 'http://localhost:3000/user/insertUser';
   
   // Prepare the request body as a Map
   final Map<String, String> body = {
@@ -259,7 +259,7 @@ class _SignupPageState extends State<SignupPage> {
                   PromptMessage = "";
                 });
 
-                final Future<bool> addStatus = addUser(accountController.text, passwordController.text);
+                final Future<bool> addStatus = insertUser(accountController.text, passwordController.text);
 
                 addStatus.then((status) {
                   if (status) {

@@ -12,6 +12,8 @@ const townRoutes = require('./routes/town');
 const youbikeRoutes = require('./routes/youbike');
 const cyclingrouteRoutes = require('./routes/cyclingroute');
 const userRoutes = require('./routes/user');
+const bmybRoutes = require('./routes/bm_yb');
+const bmcrRoutes = require('./routes/bm_cr');
 
 // 使用路由
 app.use('/city', cityRoutes);
@@ -19,6 +21,8 @@ app.use('/town', townRoutes);
 app.use('/youbike', youbikeRoutes);
 app.use('/cyclingroute', cyclingrouteRoutes);
 app.use('/user', userRoutes);
+app.use('/bmyb', bmybRoutes);
+app.use('/bmcr', bmcrRoutes);
 
 // 測試首頁
 app.get('/', (req, res) => {

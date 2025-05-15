@@ -74,18 +74,17 @@ router.get('/checkuser', (req, res, next) => {
 });
 
 // Insert a user
-router.post('/addUser', (req, res) => {
+router.post('/insertUser', (req, res) => {
 
-    console.log(req);
     const { Account, Password } = req.body;
-
     
     if (!Account || !Password) {
         return res.status(400).send({ error: 'Account and Password are required' });
     }
 
-    const sql = 'INSERT INTO user (Account, Password) VALUES (?, ?)';
-    pool.query(sql, [Account, Password], (err, result) => {
+    let sql = 'INSERT INTO user (Account, Password) VALUES (?, ?)';
+    let param = [Account, Password];
+    pool.query(sql, param, (err, result) => {
         if (err) {
             console.error('Error inserting user:', err);
             return res.status(500).send({ error: 'Failed to add user' });
@@ -103,8 +102,9 @@ router.put('/updateUser/:userId', (req, res) => {
         return res.status(400).send({ error: 'Account and Password are required' });
     }
 
-    const sql = 'UPDATE user SET Account = ?, Password = ?, IsManager = ? WHERE UserID = ?';
-    pool.query(sql, [Account, Password, IsManager || 0, userId], (err, result) => {
+    let sql = 'UPDATE user SET Account = ?, Password = ?, IsManager = ? WHERE UserID = ?';
+    let param = [Account, Password, IsManager || 0, userId];
+    pool.query(sql, param, (err, result) => {
         if (err) {
             console.error('Error updating user:', err);
             return res.status(500).send({ error: 'Failed to update user' });
@@ -118,12 +118,12 @@ router.put('/updateUser/:userId', (req, res) => {
 
 // Delete a user
 router.delete('/deleteUser/:userId', (req, res) => {
-    //print(req);
 
     const userId = req.params.userId;
 
-    const sql = 'DELETE FROM user WHERE UserID = ?';
-    pool.query(sql, [userId], (err, result) => {
+    let sql = 'DELETE FROM user WHERE UserID = ?';
+    let param = [userId];
+    pool.query(sql, param, (err, result) => {
         if (err) {
             console.error('Error deleting user:', err);
             return res.status(500).send({ error: 'Failed to delete user' });

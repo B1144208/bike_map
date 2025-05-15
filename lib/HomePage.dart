@@ -8,13 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 // 連接頁面
 import 'LoginPage.dart';
 import 'UserPage.dart';
-import 'LoginPage.dart';
 
 Future<bool> IsLogin() async{
   final prefs = await SharedPreferences.getInstance();
   final exists = prefs.getInt('UserID');
-  if(exists != null) return true;
-  else return false;
+  if(exists != null) 
+    return true;
+  return false;
 }
 
 class HomePage extends StatefulWidget{
@@ -195,29 +195,31 @@ class _HomePageState extends State<HomePage>{
                           context: context,
                           builder: (BuildContext context) {
                             return AlertDialog(
-                              title: const Text('提示'),
+                              title: const Text('通知'),
                               content: const Text('請先登入帳號再繼續'),
+                              actions: <Widget>[
+                                TextButton(
+                                  child: const Text('取消'),
+                                  onPressed: (){
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                                TextButton(
+                                  child: const Text('確定'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => LoginPage()),
+                                    );
+                                  },
+                                ),
+                              ],
                             );
                           },
                         );
-
-                        // 1秒後自動關閉對話框並跳轉到登入頁
-                        Future.delayed(const Duration(seconds: 1), () {
-                          Navigator.of(context).pop(); // 關閉提示框
-                          Navigator.of(context).pop(); // pop 我的收藏 context
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => LoginPage()),
-                          );
-                        });
                       }
                     });
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => UserPage()),
-                    );
-
                   },
                   child: Container(
                     width: 60,
@@ -273,7 +275,7 @@ class _HomePageState extends State<HomePage>{
                         value: town['TownID'],
                         child: Text(town['TownName']),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
 
@@ -350,32 +352,54 @@ class _HomePageState extends State<HomePage>{
                               onTap: () {
                                 showDialog(
                                   context: context,
-                                  builder: (context) => AlertDialog(
-                                    content: Text(
-                                      '城市 : ${youbikePoint['CityName']}\n'
-                                      '鄉鎮 : ${youbikePoint['TownName']}\n'
-                                      '站點 : ${youbikePoint['Name']}\n'
-                                    ),
-                                    actions: [
-                                      Positioned(
-                                        bottom: 20,
-                                        
-                                        child: FloatingActionButton(
-                                          onPressed: toggleFavorite,
-                                          backgroundColor: isFavorited ? Colors.red : Colors.grey,
-                                          child: Icon(
-                                            isFavorited ? Icons.favorite : Icons.favorite_border,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
+                                  builder: (context) {
 
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        child: const Text('關閉'),
-                                      )
-                                    ]
-                                  ),
+                                    bool locallsFavorited = isFavorited; // 建立局部狀態副本
+
+                                    return StatefulBuilder(
+                                      builder: (context, setStateDialog) {
+                                        return AlertDialog(
+                                          content: Text(
+                                            '城市 : ${youbikePoint['CityName']}\n'
+                                            '鄉鎮 : ${youbikePoint['TownName']}\n'
+                                            '站點 : ${youbikePoint['Name']}\n'
+                                          ),
+                                          actions: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.start, // 靠左
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: (){
+                                                    setStateDialog((){
+                                                      locallsFavorited = !locallsFavorited;
+                                                    });
+                                                    
+                                                    toggleFavorite();
+                                                  },
+
+                                                  child: Image.asset(
+                                                    locallsFavorited
+                                                    ? 'assets/images/heart_filled.png'
+                                                    : 'assets/images/heart_outlined.png',
+                                                    width: 40,
+                                                    height: 40,
+                                                  ),
+                                                ),
+                                                
+
+                                                const Spacer(),
+
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(context).pop(),
+                                                  child: const Text('關閉'),
+                                                )
+                                              ],
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    );
+                                  },
                                 );
                               },
                               child: const Icon(
@@ -402,6 +426,61 @@ class _HomePageState extends State<HomePage>{
                                   onTap: () {
                                     showDialog(
                                       context: context,
+                                      builder: (context) {
+
+                                        bool locallsFavorited = isFavorited; // 建立局部狀態副本
+
+                                        return StatefulBuilder(
+                                          builder: (context, setStateDialog) {
+                                            return AlertDialog(
+                                              content: Text(
+                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name']}\n'
+                                                '起點: ${cyclingroutesdata[routeIndex]['Start']}\n'
+                                                '終點: ${cyclingroutesdata[routeIndex]['End']}\n'
+                                                '長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺\n'
+                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}\n'
+                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management']}\n'
+                                              ),
+                                              actions: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.start, // 靠左
+                                                  children: [
+                                                    GestureDetector(
+                                                      onTap: (){
+                                                        setStateDialog((){
+                                                          locallsFavorited = !locallsFavorited;
+                                                        });
+                                                        
+                                                        toggleFavorite();
+                                                      },
+
+                                                      child: Image.asset(
+                                                        locallsFavorited
+                                                        ? 'assets/images/heart_filled.png'
+                                                        : 'assets/images/heart_outlined.png',
+                                                        width: 40,
+                                                        height: 40,
+                                                      ),
+                                                    ),
+                                                    
+
+                                                    const Spacer(),
+
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: const Text('關閉'),
+                                                    )
+                                                  ],
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                    );
+
+                                    /*showDialog(
+                                      context: context,
                                       builder: (BuildContext context) => AlertDialog(
                                         title: Text("路線詳細資料"),
                                         content: Column(
@@ -423,7 +502,7 @@ class _HomePageState extends State<HomePage>{
                                           ),
                                         ],
                                       ),
-                                    );
+                                    );*/
                                   },
                                   child: Opacity(
                                     opacity: 1.0, // 完全透明

@@ -41,7 +41,7 @@ class UserPage extends StatefulWidget {
 
 class _UserPageState extends State<UserPage> {
 
-   String PromptMessage = "";
+  String PromptMessage = "";
 
   @override
   Widget build(BuildContext context){
@@ -159,6 +159,29 @@ class _UserPageState extends State<UserPage> {
               child: GestureDetector(
                 onTap: () {
                   SignOut();
+
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('通知'),
+                        content: const Text('帳號已登出'),
+                        actions: <Widget>[
+                          TextButton(
+                            child: const Text('確定'),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => HomePage()),
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
                 },
                 child: Text(
                   "登出",
