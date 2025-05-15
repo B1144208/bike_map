@@ -40,16 +40,9 @@ Future<void> StoreDataInSharedPrederences (int userId) async{
       await prefs.setString('Account', user['Account']);
       await prefs.setString('Password', user['Password']);
       await prefs.setInt('IsManager', user['IsManager']);
-
-      for (var key in prefs.getKeys()){
-        var value = prefs.get(key);
-        print('$key: $value');
-      }
-      
+      await prefs.setBool('IsLogin', true);
     }
-  }
-
-  
+  }  
 }
 
 class LoginPage extends StatefulWidget {
