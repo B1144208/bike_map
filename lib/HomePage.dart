@@ -30,11 +30,13 @@ class _HomePageState extends State<HomePage>{
   List<dynamic> youbikes = [];                  // 儲存 youbike 資料
   List<dynamic> cyclingroutesdata = [];         // 儲存 cyclingroute 資料
   List<List<LatLng>> cyclingrouteslatlng = [];  // 儲存 cyclingroute latlng資料
+  List<dynamic> bookmark = [];                  // 儲存 bookmark 資料
   int? selectedCity;                            // 儲存選擇的 cityID
   int? selectedTown;                            // 儲存選擇的 townID
   bool isLoadingCities = true;                  // 是否正在加載 city 資料
   bool isLoadingTowns = false;                  // 是否正在加載 town 資料
   bool isLoadingYoubikes = false;               // 是否正在加載 youbadike 資料
+  bool isFavorited = false;                     // bookmark_暫存用
 
   final mapController = MapController();
   
@@ -93,7 +95,6 @@ class _HomePageState extends State<HomePage>{
       setState(() {
         youbikes = jsonDecode(response.body); // 解析回傳的JSON
         isLoadingYoubikes = false; // 資料加載完成
-        print('✅ youbikes 資料 加載完成');
       }); 
     }else{
       setState(() {
@@ -142,9 +143,59 @@ class _HomePageState extends State<HomePage>{
     }
   }
 
-  // 收藏
-  bool isFavorited = false;
-  void toggleFavorite() {
+  Future<bool> IsBookmarkExist(int BMID, bool IsYB) async {
+    final prefs = await SharedPreferences.getInstance();
+    final userID = prefs.getInt('UserID');
+
+    // 你 URL 的參數寫法通常是 ?key=value&key2=value2，修正如下：
+    String url = 'http://localhost:3000/bmyb?userid=$userID&ybid=$BMID';
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final bookmark = jsonDecode(response.body);
+      if (bookmark.isEmpty) {
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      throw Exception('Failed to load bookmark');
+    }
+  }
+
+  // 改成 async 函式
+  Future<void> toggleFavorite(int BMID, bool IsYB) async {
+    bool exists = await IsBookmarkExist(BMID, IsYB);
+
+    setState(() {
+      isFavorited = !isFavorited;
+
+      if (isFavorited) {
+        print('已加入收藏');
+        if (!exists) {
+          // TODO: 加入資料庫或 SharedPreferences 收藏紀錄
+        }
+      } else {
+        print('取消收藏');
+        if (exists) {
+          // TODO: 移除收藏紀錄
+        }
+      }
+    });
+  }
+
+/*
+  void toggleFavorite(int BMID, bool IsYB) {
+
+    Future<bool> IsBmExist = IsBookmarkExist(BMID, IsYB);
+    IsBmExist.then((IBE){
+      if(IBE){
+        //
+      }else{
+        
+      }
+    });
+
     setState(() {
       isFavorited = !isFavorited;
       // 這裡可以放加入收藏的業務邏輯
@@ -157,7 +208,7 @@ class _HomePageState extends State<HomePage>{
       }
     });
   }
-
+*/
   // 初始化
   @override
   void initState() {
@@ -348,51 +399,61 @@ class _HomePageState extends State<HomePage>{
                             ),
                             width: 60,
                             height: 60,
-                            child: GestureDetector( 
-                              onTap: () {
+                            child: GestureDetector(
+                              onTap: () async {
+                                bool isLog = await IsLogin();
+                                bool locallsFavorited = false;
+
+                                if (isLog) {
+                                  locallsFavorited = await IsBookmarkExist(youbikePoint['YBID'], true);
+                                } else {
+                                  locallsFavorited = false;
+                                }
+
                                 showDialog(
                                   context: context,
                                   builder: (context) {
-
-                                    bool locallsFavorited = isFavorited; // 建立局部狀態副本
-
                                     return StatefulBuilder(
                                       builder: (context, setStateDialog) {
                                         return AlertDialog(
                                           content: Text(
                                             '城市 : ${youbikePoint['CityName']}\n'
                                             '鄉鎮 : ${youbikePoint['TownName']}\n'
-                                            '站點 : ${youbikePoint['Name']}\n'
+                                            '站點 : ${youbikePoint['Name']}\n',
                                           ),
                                           actions: [
                                             Row(
-                                              mainAxisAlignment: MainAxisAlignment.start, // 靠左
+                                              mainAxisAlignment: MainAxisAlignment.start,
                                               children: [
                                                 GestureDetector(
-                                                  onTap: (){
-                                                    setStateDialog((){
-                                                      locallsFavorited = !locallsFavorited;
-                                                    });
-                                                    
-                                                    toggleFavorite();
+                                                  onTap: () async {
+                                                    bool isLogInner = await IsLogin();
+                                                    if (isLogInner) {
+                                                      await toggleFavorite(youbikePoint['YBID'], true);
+                                                      setStateDialog(() {
+                                                        locallsFavorited = !locallsFavorited;
+                                                      });
+                                                    } else {
+                                                      Navigator.of(context).pop();
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(builder: (context) => LoginPage()),
+                                                      );
+                                                    }
                                                   },
-
                                                   child: Image.asset(
                                                     locallsFavorited
-                                                    ? 'assets/images/heart_filled.png'
-                                                    : 'assets/images/heart_outlined.png',
+                                                        ? 'assets/images/heart_filled.png'
+                                                        : 'assets/images/heart_outlined.png',
                                                     width: 40,
                                                     height: 40,
                                                   ),
                                                 ),
-                                                
-
                                                 const Spacer(),
-
                                                 TextButton(
                                                   onPressed: () => Navigator.of(context).pop(),
                                                   child: const Text('關閉'),
-                                                )
+                                                ),
                                               ],
                                             ),
                                           ],
@@ -451,7 +512,7 @@ class _HomePageState extends State<HomePage>{
                                                           locallsFavorited = !locallsFavorited;
                                                         });
                                                         
-                                                        toggleFavorite();
+                                                        //toggleFavorite();
                                                       },
 
                                                       child: Image.asset(
