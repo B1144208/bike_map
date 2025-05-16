@@ -22,7 +22,7 @@ router.get('/', (req, res, next) => {
     })
 });
 
-
+// insert a BMYB
 router.post('/insertBMYB', (req, res) => {
 
     const { UserID, YBID } = req.body;
@@ -42,4 +42,47 @@ router.post('/insertBMYB', (req, res) => {
     });
 });
 
+
+// Delete a BMYB
+router.delete('/deleteBMYB', (req, res) => {
+  const { userid, ybid } = req.query;
+
+  if (!userid || !ybid) {
+    return res.status(400).send({ error: 'UserID and YBID are required' });
+  }
+
+  const sql = 'DELETE FROM bookmark_youbike WHERE UserID = ? AND YBID = ?';
+  const param = [userid, ybid];
+
+  pool.query(sql, param, (err, result) => {
+    if (err) {
+      console.error('Error deleting BMYB:', err);
+      return res.status(500).send({ error: 'Failed to delete BMYB' });
+    }
+    if (result.affectedRows === 0) {
+      return res.status(404).send({ error: 'No matching bookmark found' });
+    }
+    res.status(200).send({ message: 'Bookmark deleted successfully' });
+  });
+});
+
+/*
+router.delete('/deleteBMYB/:BMYBId', (req, res) => {
+
+    const BMYBId = req.params.BMYBId;
+
+    let sql = 'DELETE FROM bookmark_youbike WHERE BMYBID = ?';
+    let param = [BMYBId];
+    pool.query(sql, param, (err, result) => {
+        if (err) {
+            console.error('Error deleting BMYB:', err);
+            return res.status(500).send({ error: 'Failed to delete BMYB' });
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).send({ error: 'BMYB not found' });
+        }
+        res.status(200).send({ message: 'BMYB deleted successfully' });
+    });
+});
+*/
 module.exports = router;

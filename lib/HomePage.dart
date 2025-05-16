@@ -143,72 +143,113 @@ class _HomePageState extends State<HomePage>{
     }
   }
 
-  Future<bool> IsBookmarkExist(int BMID, bool IsYB) async {
+  Future<int> IsBookmarkExist(int BMID, bool IsYB) async {
     final prefs = await SharedPreferences.getInstance();
-    final userID = prefs.getInt('UserID');
+    final userID = prefs.getInt('UserID') ?? 0;
 
-    // 你 URL 的參數寫法通常是 ?key=value&key2=value2，修正如下：
-    String url = 'http://localhost:3000/bmyb?userid=$userID&ybid=$BMID';
+    String url;
+    if(IsYB) url = 'http://localhost:3000/bmyb?userid=$userID&ybid=$BMID';
+    else url = 'http://localhost:3000/bmcr?userid=$userID&crid=$BMID';
+
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
       final bookmark = jsonDecode(response.body);
       if (bookmark.isEmpty) {
-        return false;
-      } else {
-        return true;
+        return 0;
+      } else if(IsYB) {
+        return bookmark[0]['BMYBID'];
+      }else {
+        return bookmark[0]['BMCRID'];
       }
     } else {
       throw Exception('Failed to load bookmark');
     }
   }
 
-  // 改成 async 函式
+  Future<bool> insertBookmark(int userID, int BMID, bool IsYB) async {
+    String url;
+    if(IsYB) url = 'http://localhost:3000/bmyb/insertBMYB';
+    else url = 'http://localhost:3000/bmcr/insertBMCR';
+
+    // Prepare the request body as a Map
+    final Map<String, int> body = {
+      'UserID': userID,
+      IsYB ? 'YBID' : 'CRID': BMID,
+    };
+
+    // Make the HTTP POST request
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json', // Set the content type to JSON
+      },
+      body: jsonEncode(body), // Convert the Map to JSON
+    );
+
+    // Check the response status
+    if(response.statusCode == 201){
+      // Successfully added bookmark
+      print('Bookmark added Successfully: $response.body');
+      return true;
+    }else{
+      // Failed to add bookmark
+      
+      // 嘗試解析回應內容，如果不是有效的 JSON，顯示錯誤訊息
+      try {
+        final errorResponse = jsonDecode(response.body);
+        print('Error: ${errorResponse['error']}');
+      } catch (e) {
+        // 如果回應不是有效的 JSON，顯示純文本錯誤
+        print('Error: ${response.body}');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> removeBookmark(int userID, int BMID, bool IsYB) async {
+    String url;
+    if(IsYB) url = 'http://localhost:3000/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
+    else url = 'http://localhost:3000/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
+    final response = await http.delete(Uri.parse(url));
+
+    if(response.statusCode == 200){
+      print('Bookmark deleted successfully');
+      final prefs = await SharedPreferences.getInstance();
+      prefs.clear();
+      return true;
+    } else {
+      print('Failed to delete Bookmark: ${response.body}');
+      return false;
+    }
+  }
+  
   Future<void> toggleFavorite(int BMID, bool IsYB) async {
-    bool exists = await IsBookmarkExist(BMID, IsYB);
+    final prefs = await SharedPreferences.getInstance();
+    final userID = prefs.getInt('UserID') ?? 0;
+
+    int exists = await IsBookmarkExist(BMID, IsYB);
+    if(exists==0) isFavorited = false;
+    else isFavorited = true;
 
     setState(() {
       isFavorited = !isFavorited;
-
-      if (isFavorited) {
-        print('已加入收藏');
-        if (!exists) {
-          // TODO: 加入資料庫或 SharedPreferences 收藏紀錄
-        }
-      } else {
-        print('取消收藏');
-        if (exists) {
+      try {
+        if (isFavorited) {
+          // TODO: 加入資料庫
+          insertBookmark(userID, BMID, IsYB);
+          print('已加入收藏');
+        } else {
           // TODO: 移除收藏紀錄
+          removeBookmark(userID, BMID, IsYB);
+          print('取消收藏');
         }
+      }catch (e){
+        print('❌ 收藏操作失敗: $e');
       }
     });
   }
 
-/*
-  void toggleFavorite(int BMID, bool IsYB) {
-
-    Future<bool> IsBmExist = IsBookmarkExist(BMID, IsYB);
-    IsBmExist.then((IBE){
-      if(IBE){
-        //
-      }else{
-        
-      }
-    });
-
-    setState(() {
-      isFavorited = !isFavorited;
-      // 這裡可以放加入收藏的業務邏輯
-      if (isFavorited) {
-        print('已加入收藏');
-        // TODO: 加入資料庫或 SharedPreferences 收藏紀錄
-      } else {
-        print('取消收藏');
-        // TODO: 移除收藏紀錄
-      }
-    });
-  }
-*/
   // 初始化
   @override
   void initState() {
@@ -405,7 +446,8 @@ class _HomePageState extends State<HomePage>{
                                 bool locallsFavorited = false;
 
                                 if (isLog) {
-                                  locallsFavorited = await IsBookmarkExist(youbikePoint['YBID'], true);
+                                  final BMYBID = await IsBookmarkExist(int.parse(youbikePoint['YBID'].toString()), true);
+                                  locallsFavorited = (BMYBID==0)? false: true;
                                 } else {
                                   locallsFavorited = false;
                                 }
@@ -484,7 +526,74 @@ class _HomePageState extends State<HomePage>{
                                 width: 60,
                                 height: 60,
                                 child: GestureDetector(
-                                  onTap: () {
+                                  onTap: () async {
+                                    bool isLog = await IsLogin();
+                                    bool locallsFavorited = false;
+
+                                    if (isLog) {
+                                      final BMCRID = await IsBookmarkExist(int.parse(cyclingroutesdata[routeIndex]['CRID'].toString()), false);
+                                      locallsFavorited = (BMCRID==0)? false: true;
+                                    } else {
+                                      locallsFavorited = false;
+                                    }
+
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) {
+                                        return StatefulBuilder(
+                                          builder: (context, setStateDialog) {
+                                            return AlertDialog(
+                                              content: Text(
+                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name']}\n'
+                                                '起點: ${cyclingroutesdata[routeIndex]['Start']}\n'
+                                                '終點: ${cyclingroutesdata[routeIndex]['End']}\n'
+                                                '長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺\n'
+                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}\n'
+                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management']}\n'
+                                              ),
+                                              actions: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.start,
+                                                  children: [
+                                                    GestureDetector(
+                                                      onTap: () async {
+                                                        bool isLogInner = await IsLogin();
+                                                        if (isLogInner) {
+                                                          await toggleFavorite(cyclingroutesdata[routeIndex]['CRID'], false);
+                                                          setStateDialog(() {
+                                                            locallsFavorited = !locallsFavorited;
+                                                          });
+                                                        } else {
+                                                          Navigator.of(context).pop();
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(builder: (context) => LoginPage()),
+                                                          );
+                                                        }
+                                                      },
+                                                      child: Image.asset(
+                                                        locallsFavorited
+                                                            ? 'assets/images/heart_filled.png'
+                                                            : 'assets/images/heart_outlined.png',
+                                                        width: 40,
+                                                        height: 40,
+                                                      ),
+                                                    ),
+                                                    const Spacer(),
+                                                    TextButton(
+                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: const Text('關閉'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
+                                    );
+                                  },
+                                  /*onTap: () {
                                     showDialog(
                                       context: context,
                                       builder: (context) {
@@ -564,7 +673,7 @@ class _HomePageState extends State<HomePage>{
                                         ],
                                       ),
                                     );*/
-                                  },
+                                  },*/
                                   child: Opacity(
                                     opacity: 1.0, // 完全透明
                                     child: const Icon(
