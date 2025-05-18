@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:project/BookmarkPage.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 連接頁面
-import 'LoginPage.dart';
 import 'HomePage.dart';
+import 'BookmarkPage.dart';
 
 Future<void> SignOut() async{
   final prefs = await SharedPreferences.getInstance();
@@ -59,7 +60,7 @@ class _UserPageState extends State<UserPage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => LoginPage()), //****************************************************************************
+                  MaterialPageRoute(builder: (context) => BookmarkPage()),
                 );
               },
               child: const Text('我的收藏'),

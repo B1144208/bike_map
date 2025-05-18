@@ -215,8 +215,6 @@ class _HomePageState extends State<HomePage>{
 
     if(response.statusCode == 200){
       print('Bookmark deleted successfully');
-      final prefs = await SharedPreferences.getInstance();
-      prefs.clear();
       return true;
     } else {
       print('Failed to delete Bookmark: ${response.body}');
@@ -270,60 +268,65 @@ class _HomePageState extends State<HomePage>{
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget> [
 
-                // 收藏按鈕，放置在左側
-                InkWell(
-                  onTap: (){
-
-                    Future<bool> isLog = IsLogin();
-                    isLog.then((islog){
-                      if(islog){
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => UserPage()),
-                        );
-                      }else{
-                        // 跳出提示框要求登入
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) {
-                            return AlertDialog(
-                              title: const Text('通知'),
-                              content: const Text('請先登入帳號再繼續'),
-                              actions: <Widget>[
-                                TextButton(
-                                  child: const Text('取消'),
-                                  onPressed: (){
-                                    Navigator.of(context).pop();
-                                  },
-                                ),
-                                TextButton(
-                                  child: const Text('確定'),
-                                  onPressed: () {
-                                    Navigator.of(context).pop();
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => LoginPage()),
-                                    );
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                    });
-                  },
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      image: DecorationImage(
-                        image: AssetImage('assets/images/user_icon.png'),
-                        fit: BoxFit.cover,
+                // 個人帳號，放置在左側
+                FutureBuilder(
+                  future: IsLogin(),
+                  builder:(context, snapshot) {
+                    bool isLoggedIn = snapshot.data ?? false;
+                    return InkWell(
+                      onTap: (){
+                        if(isLoggedIn){
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => UserPage()),
+                          );
+                        }else{
+                          // 跳出提示框要求登入
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return AlertDialog(
+                                title: const Text('通知'),
+                                content: const Text('請先登入帳號再繼續'),
+                                actions: <Widget>[
+                                  TextButton(
+                                    child: const Text('取消'),
+                                    onPressed: (){
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                  TextButton(
+                                    child: const Text('確定'),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => LoginPage()),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+                      },
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Theme.of(context).scaffoldBackgroundColor,
+                        ),
+                        child: Icon(
+                          isLoggedIn ? Icons.account_circle_rounded : Icons.account_circle_outlined,
+                          color: Colors.black,
+                          size: 40,
+                        ),
                       ),
-                    ),
-                  ),
+                      
+                    );
+                  },
                 ),
 
                 const Spacer(),
@@ -593,87 +596,6 @@ class _HomePageState extends State<HomePage>{
                                       },
                                     );
                                   },
-                                  /*onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) {
-
-                                        bool locallsFavorited = isFavorited; // 建立局部狀態副本
-
-                                        return StatefulBuilder(
-                                          builder: (context, setStateDialog) {
-                                            return AlertDialog(
-                                              content: Text(
-                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name']}\n'
-                                                '起點: ${cyclingroutesdata[routeIndex]['Start']}\n'
-                                                '終點: ${cyclingroutesdata[routeIndex]['End']}\n'
-                                                '長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺\n'
-                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}\n'
-                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management']}\n'
-                                              ),
-                                              actions: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.start, // 靠左
-                                                  children: [
-                                                    GestureDetector(
-                                                      onTap: (){
-                                                        setStateDialog((){
-                                                          locallsFavorited = !locallsFavorited;
-                                                        });
-                                                        
-                                                        //toggleFavorite();
-                                                      },
-
-                                                      child: Image.asset(
-                                                        locallsFavorited
-                                                        ? 'assets/images/heart_filled.png'
-                                                        : 'assets/images/heart_outlined.png',
-                                                        width: 40,
-                                                        height: 40,
-                                                      ),
-                                                    ),
-                                                    
-
-                                                    const Spacer(),
-
-                                                    TextButton(
-                                                      onPressed: () => Navigator.of(context).pop(),
-                                                      child: const Text('關閉'),
-                                                    )
-                                                  ],
-                                                ),
-                                              ],
-                                            );
-                                          },
-                                        );
-                                      },
-                                    );
-
-                                    /*showDialog(
-                                      context: context,
-                                      builder: (BuildContext context) => AlertDialog(
-                                        title: Text("路線詳細資料"),
-                                        content: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.min, // 避免內容超出範圍
-                                          children: [
-                                            Text('路線名稱: ${cyclingroutesdata[routeIndex]['Name']}'),
-                                            Text('起點: ${cyclingroutesdata[routeIndex]['Start']}'),
-                                            Text('終點: ${cyclingroutesdata[routeIndex]['End']}'),
-                                            Text('長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺'),
-                                            Text('完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}'),
-                                            Text('管理單位: ${cyclingroutesdata[routeIndex]['Management']}'),
-                                          ],
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(context).pop(),
-                                            child: Text("關閉"),
-                                          ),
-                                        ],
-                                      ),
-                                    );*/
-                                  },*/
                                   child: Opacity(
                                     opacity: 1.0, // 完全透明
                                     child: const Icon(

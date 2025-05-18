@@ -6,8 +6,8 @@ router.get('/', (req, res, next) => {
     const userID = req.query.userid;
     const ybID = req.query.ybid;
 
-    let sql = 'SELECT * FROM bookmark_youbike WHERE 1';
-    let params = [];
+    let sql = 'SELECT * FROM bookmark_youbike WHERE UserID=? ORDER BY YBID ASC';
+    let params = [userID];
     if(userID && ybID){
         sql = 'SELECT * FROM bookmark_youbike WHERE UserID=? AND YBID=?';
         params = [userID, ybID];
@@ -66,23 +66,4 @@ router.delete('/deleteBMYB', (req, res) => {
   });
 });
 
-/*
-router.delete('/deleteBMYB/:BMYBId', (req, res) => {
-
-    const BMYBId = req.params.BMYBId;
-
-    let sql = 'DELETE FROM bookmark_youbike WHERE BMYBID = ?';
-    let param = [BMYBId];
-    pool.query(sql, param, (err, result) => {
-        if (err) {
-            console.error('Error deleting BMYB:', err);
-            return res.status(500).send({ error: 'Failed to delete BMYB' });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).send({ error: 'BMYB not found' });
-        }
-        res.status(200).send({ message: 'BMYB deleted successfully' });
-    });
-});
-*/
 module.exports = router;
