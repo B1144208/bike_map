@@ -29,7 +29,7 @@ class _HomePageState extends State<HomePage>{
   List<dynamic> towns = [];                     // 儲存 town 資料
   List<dynamic> youbikes = [];                  // 儲存 youbike 資料
   List<dynamic> cyclingroutesdata = [];         // 儲存 cyclingroute 資料
-  List<List<LatLng>> cyclingrouteslatlng = [];  // 儲存 cyclingroute latlng資料
+  List<Map<String, dynamic>> cyclingroutes = [];
   List<dynamic> bookmark = [];                  // 儲存 bookmark 資料
   int? selectedCity;                            // 儲存選擇的 cityID
   int? selectedTown;                            // 儲存選擇的 townID
@@ -118,26 +118,45 @@ class _HomePageState extends State<HomePage>{
 
 
     if (response.statusCode == 200) {
-      cyclingroutesdata = jsonDecode(response.body);
-      final List<List<LatLng>> parsedRoutes = [];
 
       for (final route in cyclingroutesdata) {
         final geometryStr = route['Geometry'];
-        final geometry = jsonDecode(geometryStr); // decode GeoJSON string
-        final List coordinatesGroups = geometry['coordinates'];
+        final geometry = jsonDecode(geometryStr);
+        final coordinatesGroups = geometry['coordinates'];
 
         for (final group in coordinatesGroups) {
-          final List<LatLng> latLngGroup = group.map<LatLng>((point) {
-            return LatLng(point[1], point[0]); // [lon, lat] → LatLng(lat, lon)
-          }).toList();
+          final latLngGroup = group.map<LatLng>((point) => LatLng(point[1], point[0])).toList();
 
-          parsedRoutes.add(latLngGroup);
+          cyclingroutes.add({
+            'data': route,
+            'latlng': latLngGroup,
+          });
+        }
+      }
+
+      cyclingroutesdata = jsonDecode(response.body);
+
+      for (final route in cyclingroutesdata) {
+        final geometryStr = route['Geometry'];
+        final geometry = jsonDecode(geometryStr);
+        final coordinatesGroups = geometry['coordinates'];
+
+        for (final group in coordinatesGroups) {
+
+          final latLngGroup = group.map<LatLng>((point) => LatLng(point[1], point[0])).toList();
+
+          cyclingroutes.add({
+            'data': route,
+            'latlng': latLngGroup,
+          });
         }
       }
 
       setState(() {
-        cyclingrouteslatlng = parsedRoutes;
+        // 儲存整合後的列表
+        this.cyclingroutes = cyclingroutes;
       });
+      
     } else {
       throw Exception('Failed to load cycling routes');
     }
@@ -505,11 +524,6 @@ class _HomePageState extends State<HomePage>{
                                                           );
                                                         },
                                                       );
-                                                      /*Navigator.of(context).pop();
-                                                      Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(builder: (context) => LoginPage()),
-                                                      );*/
                                                     }
                                                   },
                                                   child: Image.asset(
@@ -546,12 +560,14 @@ class _HomePageState extends State<HomePage>{
                       
                       // cyclingroute 的起始點
                       MarkerLayer(
-                        markers: cyclingrouteslatlng.asMap().map((routeIndex, route) {
-                          return MapEntry(
-                            routeIndex,
-                            [
-                              Marker(
-                                point: route[0],  // 只用第一個 LatLng 點
+
+                        markers: cyclingroutes.map((routeItem) {
+                          final data = routeItem['data'];
+                          final latlng = routeItem['latlng'];
+
+                          return Marker(
+                            
+                                point: latlng[0],  // 只用第一個 LatLng 點
                                 width: 60,
                                 height: 60,
                                 child: GestureDetector(
@@ -560,7 +576,7 @@ class _HomePageState extends State<HomePage>{
                                     bool locallsFavorited = false;
 
                                     if (isLog) {
-                                      final BMCRID = await IsBookmarkExist(int.parse(cyclingroutesdata[routeIndex]['CRID'].toString()), false);
+                                      final BMCRID = await IsBookmarkExist(int.parse(data['CRID'].toString()), false);
                                       locallsFavorited = (BMCRID==0)? false: true;
                                     } else {
                                       locallsFavorited = false;
@@ -573,13 +589,13 @@ class _HomePageState extends State<HomePage>{
                                           builder: (context, setStateDialog) {
                                             return AlertDialog(
                                               content: Text(
-                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name'] ?? '無資料'}\n'
-                                                '路線別名: ${cyclingroutesdata[routeIndex]['AlternateNames'] ?? '無資料'}\n'
-                                                '起　　點: ${cyclingroutesdata[routeIndex]['Start'] ?? '無資料'}\n'
-                                                '終　　點: ${cyclingroutesdata[routeIndex]['End'] ?? '無資料'}\n'
-                                                '長　　度: ${cyclingroutesdata[routeIndex]['Length'] ?? '無資料'} 公尺\n'
-                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate'] ?? '無資料'}\n'
-                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management'] ?? '無資料'}\n'
+                                                '路線名稱: ${data['Name'] ?? '無資料'}\n'
+                                                '路線別名: ${data['AlternateNames'] ?? '無資料'}\n'
+                                                '起　　點: ${data['Start'] ?? '無資料'}\n'
+                                                '終　　點: ${data['End'] ?? '無資料'}\n'
+                                                '長　　度: ${data['Length'] ?? '無資料'} 公尺\n'
+                                                '完成日期: ${data['FinishDate'] ?? '無資料'}\n'
+                                                '管理單位: ${data['Management'] ?? '無資料'}\n'
                                               ),
                                               actions: [
                                                 Row(
@@ -589,7 +605,7 @@ class _HomePageState extends State<HomePage>{
                                                       onTap: () async {
                                                         bool isLogInner = await IsLogin();
                                                         if (isLogInner) {
-                                                          await toggleFavorite(cyclingroutesdata[routeIndex]['CRID'], false);
+                                                          await toggleFavorite(data['CRID'], false);
                                                           setStateDialog(() {
                                                             locallsFavorited = !locallsFavorited;
                                                           });
@@ -621,11 +637,6 @@ class _HomePageState extends State<HomePage>{
                                                               );
                                                             },
                                                           );
-                                                          /*Navigator.of(context).pop();
-                                                          Navigator.push(
-                                                            context,
-                                                            MaterialPageRoute(builder: (context) => LoginPage()),
-                                                          );*/
                                                         }
                                                       },
                                                       child: Image.asset(
@@ -659,11 +670,10 @@ class _HomePageState extends State<HomePage>{
                                     ),
                                   ),
                                 ),
-                              )
-                            ],
                           );
-                        }).values.expand((element) => element).toList(),
+                        }).toList(),
                       ),
+
                       // 全部的 cyclingroute 點
                       /*MarkerLayer(
                         markers: cyclingrouteslatlng.asMap().map((routeIndex, route) {
@@ -716,18 +726,13 @@ class _HomePageState extends State<HomePage>{
                       ),*/
 
                       PolylineLayer(
-                        polylines:
-                          cyclingrouteslatlng.asMap().map((index, route){
-                            return MapEntry(
-                              index,
-                              Polyline(
-                                points: route,
-                                strokeWidth: 4,
-                                color: Colors.blue,
-                                
-                              ),
-                            );
-                          }).values.toList(),
+                        polylines: cyclingroutes.map<Polyline>((route) {
+                          return Polyline(
+                            points: route['latlng'], // 使用 latlng 欄位
+                            strokeWidth: 4,
+                            color: Colors.blue,
+                          );
+                        }).toList(),
                       ),
                     ],
                   ),
