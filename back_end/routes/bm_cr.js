@@ -6,7 +6,9 @@ router.get('/', (req, res, next) => {
     const userID = req.query.userid;
     const crID = req.query.crid;
 
-    let sql = 'SELECT * FROM bookmark_cyclingroute WHERE UserID=? ORDER BY CRID ASC';
+    if(!userID) return;
+
+    let sql = 'SELECT * FROM bookmark_cyclingroute NATURAL JOIN cyclingroute NATURAL JOIN city NATURAL JOIN town WHERE UserID=? ORDER BY CRID ASC';
     let params = [userID];
     if(userID && crID){
         sql = 'SELECT * FROM bookmark_cyclingroute WHERE UserID=? AND CRID=?';

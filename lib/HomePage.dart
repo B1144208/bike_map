@@ -479,11 +479,38 @@ class _HomePageState extends State<HomePage>{
                                                         locallsFavorited = !locallsFavorited;
                                                       });
                                                     } else {
-                                                      Navigator.of(context).pop();
+                                                      showDialog(
+                                                        context: context,
+                                                        builder: (BuildContext context) {
+                                                          return AlertDialog(
+                                                            title: const Text('通知'),
+                                                            content: const Text('請先登入帳號再繼續'),
+                                                            actions: <Widget>[
+                                                              TextButton(
+                                                                child: const Text('取消'),
+                                                                onPressed: (){
+                                                                  Navigator.of(context).pop();
+                                                                },
+                                                              ),
+                                                              TextButton(
+                                                                child: const Text('確定'),
+                                                                onPressed: () {
+                                                                  Navigator.of(context).pop();
+                                                                  Navigator.push(
+                                                                    context,
+                                                                    MaterialPageRoute(builder: (context) => LoginPage()),
+                                                                  );
+                                                                },
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
+                                                      );
+                                                      /*Navigator.of(context).pop();
                                                       Navigator.push(
                                                         context,
                                                         MaterialPageRoute(builder: (context) => LoginPage()),
-                                                      );
+                                                      );*/
                                                     }
                                                   },
                                                   child: Image.asset(
@@ -547,12 +574,13 @@ class _HomePageState extends State<HomePage>{
                                           builder: (context, setStateDialog) {
                                             return AlertDialog(
                                               content: Text(
-                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name']}\n'
-                                                '起點: ${cyclingroutesdata[routeIndex]['Start']}\n'
-                                                '終點: ${cyclingroutesdata[routeIndex]['End']}\n'
-                                                '長度: ${cyclingroutesdata[routeIndex]['Length']} 公尺\n'
-                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate']}\n'
-                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management']}\n'
+                                                '路線名稱: ${cyclingroutesdata[routeIndex]['Name'] ?? '無資料'}\n'
+                                                '路線別名: ${cyclingroutesdata[routeIndex]['AlternateNames'] ?? '無資料'}\n'
+                                                '起　　點: ${cyclingroutesdata[routeIndex]['Start'] ?? '無資料'}\n'
+                                                '終　　點: ${cyclingroutesdata[routeIndex]['End'] ?? '無資料'}\n'
+                                                '長　　度: ${cyclingroutesdata[routeIndex]['Length'] ?? '無資料'} 公尺\n'
+                                                '完成日期: ${cyclingroutesdata[routeIndex]['FinishDate'] ?? '無資料'}\n'
+                                                '管理單位: ${cyclingroutesdata[routeIndex]['Management'] ?? '無資料'}\n'
                                               ),
                                               actions: [
                                                 Row(
@@ -567,11 +595,38 @@ class _HomePageState extends State<HomePage>{
                                                             locallsFavorited = !locallsFavorited;
                                                           });
                                                         } else {
-                                                          Navigator.of(context).pop();
+                                                          showDialog(
+                                                            context: context,
+                                                            builder: (BuildContext context) {
+                                                              return AlertDialog(
+                                                                title: const Text('通知'),
+                                                                content: const Text('請先登入帳號再繼續'),
+                                                                actions: <Widget>[
+                                                                  TextButton(
+                                                                    child: const Text('取消'),
+                                                                    onPressed: (){
+                                                                      Navigator.of(context).pop();
+                                                                    },
+                                                                  ),
+                                                                  TextButton(
+                                                                    child: const Text('確定'),
+                                                                    onPressed: () {
+                                                                      Navigator.of(context).pop();
+                                                                      Navigator.push(
+                                                                        context,
+                                                                        MaterialPageRoute(builder: (context) => LoginPage()),
+                                                                      );
+                                                                    },
+                                                                  ),
+                                                                ],
+                                                              );
+                                                            },
+                                                          );
+                                                          /*Navigator.of(context).pop();
                                                           Navigator.push(
                                                             context,
                                                             MaterialPageRoute(builder: (context) => LoginPage()),
-                                                          );
+                                                          );*/
                                                         }
                                                       },
                                                       child: Image.asset(

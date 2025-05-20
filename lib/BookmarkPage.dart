@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// 連接頁面
+import 'HomePage.dart';
 
 class BookmarkPage extends StatefulWidget{
   const BookmarkPage({super.key});
@@ -13,7 +15,9 @@ class BookmarkPage extends StatefulWidget{
 
 class _BookmarkPageState extends State<BookmarkPage>{
 
-  List<dynamic> bookmark = [];
+  List<dynamic> BM_YB = [];
+  List<dynamic> BM_CR = [];
+  
 
   bool showYoubike = true;
 
@@ -31,10 +35,15 @@ class _BookmarkPageState extends State<BookmarkPage>{
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      setState((){
-        bookmark = jsonDecode(response.body);
-      });
-      
+      if(IsYB){
+        setState((){
+          BM_YB = jsonDecode(response.body);
+        });
+      }else{
+        setState((){
+          BM_CR = jsonDecode(response.body);
+        });
+      }
       
     } else {
       throw Exception('Failed to load bookmark');
@@ -49,6 +58,7 @@ class _BookmarkPageState extends State<BookmarkPage>{
   }
   void _loadBookmark() async{
     FetchBookmark(await searchUserID(), true);
+    FetchBookmark(await searchUserID(), false);
   }
 
   @override
@@ -97,23 +107,55 @@ class _BookmarkPageState extends State<BookmarkPage>{
 
             // Scrollable content
             Expanded(
-              child: ListView.builder(
-                itemCount: bookmark.length,
-                itemBuilder: (context, index) {
-                  final item = bookmark[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Card(
-                      elevation: 2,
-                      child: ListTile(
-                        leading: const Icon(Icons.bookmark),
-                        title: Text(item['BMYBID'].toString() ?? ''),
-                        subtitle: Text(item['YBID'].toString() ?? ''),
+              
+              child: 
+              showYoubike
+              ? ListView.builder(
+                  itemCount: BM_YB.length,
+                  itemBuilder: (context, index) {
+                    final item = BM_YB[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Card(
+                        elevation: 2,
+                        child: ListTile(
+                          leading: const Icon(Icons.bookmark),
+                          title: Text(item['Name'].toString()),
+                          subtitle: 
+                              Text('${item['CityName']}\t${item['TownName']}'),
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                )
+              : ListView.builder(
+                  itemCount: BM_CR.length,
+                  itemBuilder: (context, index) {
+                    final item = BM_CR[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Card(
+                        elevation: 2,
+                        child: ListTile(
+                          leading: const Icon(Icons.bookmark),
+                          title: Text(item['Name'].toString()),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${item['CityName']}\t${item['TownName']}'),
+                              Text('路線別名: ${item['AlternateNames'] ?? '無資料'}'),
+                              Text('起　　點: ${item['Start'] ?? '無資料'}'),
+                              Text('終　　點: ${item['End'] ?? '無資料'}'),
+                              Text('長　　度: ${item['Length'] ?? '無資料'}'),
+                              Text('完成日期: ${item['FinishDate'] ?? '無資料'}'),
+                              Text('管理單位: ${item['Management'] ?? '無資料'}'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ),
             
           ],
