@@ -1,10 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:project/UserPage.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// 連接頁面
-import 'HomePage.dart';
+
+Future<bool> insertBookmark(int BMID, bool IsYB) async {
+  String url;
+  final userID = await searchUserID();
+
+  if(IsYB) url = 'http://localhost:3000/bmyb/insertBMYB';
+  else url = 'http://localhost:3000/bmcr/insertBMCR';
+
+  // Prepare the request body as a Map
+  final Map<String, int> body = {
+    'UserID': userID,
+    IsYB ? 'YBID' : 'CRID': BMID,
+  };
+
+  // Make the HTTP POST request
+  final response = await http.post(
+    Uri.parse(url),
+    headers: {
+      'Content-Type': 'application/json', // Set the content type to JSON
+    },
+    body: jsonEncode(body), // Convert the Map to JSON
+  );
+
+  // Check the response status
+  if(response.statusCode == 201){
+    // Successfully added bookmark
+    return true;
+  }else{
+    // Failed to add bookmark
+    
+    // 嘗試解析回應內容，如果不是有效的 JSON，顯示錯誤訊息
+    try {
+      final errorResponse = jsonDecode(response.body);
+      print('Error: ${errorResponse['error']}');
+    } catch (e) {
+      // 如果回應不是有效的 JSON，顯示純文本錯誤
+      print('Error: ${response.body}');
+    }
+    return false;
+  }
+}
+
+Future<bool> removeBookmark(int BMID, bool IsYB) async {
+  String url;
+  final userID = await searchUserID();
+
+  if(IsYB) url = 'http://localhost:3000/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
+  else url = 'http://localhost:3000/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
+  final response = await http.delete(Uri.parse(url));
+  
+  if(response.statusCode == 200){
+    return true;
+  } else {
+    return false;
+  }
+}
+  
 
 class BookmarkPage extends StatefulWidget{
   const BookmarkPage({super.key});
@@ -17,6 +73,8 @@ class _BookmarkPageState extends State<BookmarkPage>{
 
   List<dynamic> BM_YB = [];
   List<dynamic> BM_CR = [];
+  Set<int> favoritedYBIDs = {};
+  Set<int> favoritedCRIDs = {};
   
 
   bool showYoubike = true;
@@ -38,10 +96,12 @@ class _BookmarkPageState extends State<BookmarkPage>{
       if(IsYB){
         setState((){
           BM_YB = jsonDecode(response.body);
+          favoritedYBIDs = BM_YB.map<int>((e) => e['YBID'] as int).toSet();
         });
       }else{
         setState((){
           BM_CR = jsonDecode(response.body);
+          favoritedCRIDs = BM_CR.map<int>((e) => e['CRID'] as int).toSet();
         });
       }
       
@@ -88,6 +148,7 @@ class _BookmarkPageState extends State<BookmarkPage>{
                     onPressed: (index) {
                       setState(() {
                         showYoubike = index==0;
+                        _loadBookmark();
                       });
                     },
                     constraints: const BoxConstraints(minWidth: 50, minHeight: 40),
@@ -119,7 +180,25 @@ class _BookmarkPageState extends State<BookmarkPage>{
                       child: Card(
                         elevation: 2,
                         child: ListTile(
-                          leading: const Icon(Icons.bookmark),
+                          leading:  GestureDetector(
+                            onTap: () {
+                              final ybid = item['YBID'];
+                              setState(() {
+                                if (favoritedYBIDs.contains(ybid)) {
+                                  favoritedYBIDs.remove(ybid);
+                                  removeBookmark(ybid, true);
+                                } else {
+                                  favoritedYBIDs.add(ybid);
+                                  insertBookmark(ybid, true);
+                                }
+                              });
+                            },
+                            child: Icon(
+                              favoritedYBIDs.contains(item['YBID']) ? Icons.bookmark : Icons.bookmark_border,
+                              color: Colors.blue,
+                            ),
+                          ),
+
                           title: Text(item['Name'].toString()),
                           subtitle: 
                               Text('${item['CityName']}\t${item['TownName']}'),
@@ -137,7 +216,25 @@ class _BookmarkPageState extends State<BookmarkPage>{
                       child: Card(
                         elevation: 2,
                         child: ListTile(
-                          leading: const Icon(Icons.bookmark),
+                          leading:  GestureDetector(
+                            onTap: () {
+                              final crid = item['CRID'];
+                              setState(() {
+                                if (favoritedCRIDs.contains(crid)) {
+                                  favoritedCRIDs.remove(crid);
+                                  removeBookmark(crid, false);
+                                } else {
+                                  favoritedCRIDs.add(crid);
+                                  insertBookmark(crid, false);
+                                }
+                              });
+                            },
+                            child: Icon(
+                              favoritedCRIDs.contains(item['CRID']) ? Icons.bookmark : Icons.bookmark_border,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          /*leading: const Icon(Icons.bookmark),*/
                           title: Text(item['Name'].toString()),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

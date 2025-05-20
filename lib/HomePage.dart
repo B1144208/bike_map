@@ -190,7 +190,6 @@ class _HomePageState extends State<HomePage>{
     // Check the response status
     if(response.statusCode == 201){
       // Successfully added bookmark
-      print('Bookmark added Successfully: $response.body');
       return true;
     }else{
       // Failed to add bookmark
