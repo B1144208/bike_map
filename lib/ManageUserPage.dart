@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-// config.dart 中要定義 baseUrl，例如：https://xxx.ngrok-free.app
+// 連接頁面
 import 'config.dart';
 
 class ManageUserPage extends StatefulWidget {

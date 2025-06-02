@@ -41,7 +41,9 @@ class _AdminPageState extends State<AdminPage> {
               },
               child: const Text('管理 User 資料'),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 30),
+
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -51,7 +53,9 @@ class _AdminPageState extends State<AdminPage> {
               },
               child: const Text('管理 City / Town 資料'),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 30),
+
             FilledButton(
               onPressed: () {
                 Navigator.push(
@@ -61,7 +65,9 @@ class _AdminPageState extends State<AdminPage> {
               },
               child: const Text('管理 YouBike 資料'),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 30),
+
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
@@ -71,7 +77,9 @@ class _AdminPageState extends State<AdminPage> {
               },
               child: const Text('管理 CyclingRoute 資料'),
             ),
-            const SizedBox(height: 24),
+            
+            const SizedBox(height: 30),
+
             MouseRegion(
               cursor: SystemMouseCursors.click, // 滑鼠變成手指
               child: GestureDetector(

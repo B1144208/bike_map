@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'HomePage.dart';
 import 'BookmarkPage.dart';
+import 'ChangePasswordPage.dart';
 
 Future<void> SignOut() async{
   final prefs = await SharedPreferences.getInstance();
@@ -69,8 +70,20 @@ class _UserPageState extends State<UserPage> {
 
             const SizedBox(height: 30),
 
-            // 刪除帳號按鈕
             ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChangePasswordPage()),
+                );
+              },
+              child: const Text('修改密碼'),
+            ),
+
+            const SizedBox(height: 30),
+
+            // 刪除帳號按鈕
+            FilledButton(
               onPressed: () {
                 showDialog(
                   context: context,
