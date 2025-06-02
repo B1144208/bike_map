@@ -105,50 +105,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       throw Exception('Failed to load towns');
     }
   }
-  // 新增 youbikes
-  Future<void> _submitInsert() async {
-    if (selectedTown == null ||
-        nameController.text.isEmpty ||
-        longitudeController.text.isEmpty ||
-        latitudeController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('輸入不完整')),
-      );
-      return;
-    }
 
-    final body = {
-      'TownID': selectedTown,
-      'Name': nameController.text,
-      'Longitude': double.tryParse(longitudeController.text),
-      'Latitude': double.tryParse(latitudeController.text),
-    };
-
-    final response = await http.post(
-      Uri.parse('$baseUrl/youbike/insertYoubike'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('新增成功')),
-      );
-      setState(() {
-        isAdding = false;
-        
-        nameController.clear();
-        longitudeController.clear();
-        latitudeController.clear();
-      });
-      await fetchYoubikes();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('新增失敗')),
-      );
-    }
-  }
-  Widget _buildInsertForm() {
+  Widget _youbikeForm() {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -208,8 +166,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton(
-                onPressed: _submitInsert,
-                child: const Text('確認新增'),
+                onPressed: editingYBID == null ? _insertYoubike : _updateYoubike,
+                child: Text(editingYBID == null ? '確認新增' : '確認修改'),
               ),
               const SizedBox(width: 20),
               ElevatedButton(
@@ -217,6 +175,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                   setState(() {
                     isAdding = false;
                     editingYBID = null;
+                    nameController.clear();
+                    longitudeController.clear();
+                    latitudeController.clear();
                   });
                 },
                 child: const Text('取消'),
@@ -226,144 +187,92 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         ],
       ),
     );
+  }
+  
+  // 新增 youbikes
+  Future<void> _insertYoubike() async {
+    if (selectedTown == null ||
+        nameController.text.isEmpty ||
+        longitudeController.text.isEmpty ||
+        latitudeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('輸入不完整')),
+      );
+      return;
+    }
+
+    final body = {
+      'TownID': selectedTown,
+      'Name': nameController.text,
+      'Longitude': double.tryParse(longitudeController.text),
+      'Latitude': double.tryParse(latitudeController.text),
+    };
+
+    final response = await http.post(
+      Uri.parse('$baseUrl/youbike/insertYoubike'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('新增成功')),
+      );
+      setState(() {
+        isAdding = false;
+        
+        nameController.clear();
+        longitudeController.clear();
+        latitudeController.clear();
+      });
+      await fetchYoubikes();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('新增失敗')),
+      );
+    }
   }
 
   // 修改 youbikes
-  Widget _buildEditForm({
-    required int ybid,
-    required int? initCity,
-    required int? initTown,
-    required String initName,
-    required double initLon,
-    required double initLat,
-  }) {
-    selectedCity = initCity;
-    selectedTown = initTown;
-    final TextEditingController editNameController = TextEditingController(text: initName);
-    final TextEditingController editLongitudeController = TextEditingController(text: initLon.toString());
-    final TextEditingController editLatitudeController = TextEditingController(text: initLat.toString());
+  Future<void> _updateYoubike() async {
+    if (editingYBID == null || selectedTown == null || nameController.text.isEmpty || longitudeController.text.isEmpty || latitudeController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('輸入不完整')),
+      );
+      return;
+    }
 
-    final seenTowns = <int>{};
-    final uniqueTowns = towns.where((town) => seenTowns.add(town['TownID'])).toList();
+    final body = {
+      'TownID': selectedTown,
+      'Name': nameController.text,
+      'Longitude': double.tryParse(longitudeController.text),
+      'Latitude': double.tryParse(latitudeController.text),
+    };
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const Divider(height: 32, thickness: 1),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              DropdownButton<int>(
-                value: cities.any((c) => c['CityID'] == selectedCity) ? selectedCity : null,
-                hint: const Text('選擇城市'),
-                onChanged: (value) {
-                  setState(() {
-                    selectedCity = value;
-                    selectedTown = null;
-                    fetchTowns();
-                  });
-                },
-                items: cities.map<DropdownMenuItem<int>>((city) {
-                  return DropdownMenuItem<int>(
-                    value: city['CityID'],
-                    child: Text(city['CityName']),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(width: 30),
-              DropdownButton<int>(
-                value: uniqueTowns.any((t) => t['TownID'] == selectedTown) ? selectedTown : null,
-                hint: const Text('選擇鄉鎮'),
-                onChanged: (value) {
-                  setState(() => selectedTown = value);
-                },
-                items: uniqueTowns.map<DropdownMenuItem<int>>((town) {
-                  return DropdownMenuItem<int>(
-                    value: town['TownID'],
-                    child: Text(town['TownName']),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          TextField(
-            controller: editNameController,
-            decoration: const InputDecoration(labelText: '站點名稱'),
-          ),
-          TextField(
-            controller: editLongitudeController,
-            decoration: const InputDecoration(labelText: '經度'),
-            keyboardType: TextInputType.number,
-          ),
-          TextField(
-            controller: editLatitudeController,
-            decoration: const InputDecoration(labelText: '緯度'),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () async {
-                  if (selectedTown == null ||
-                      editNameController.text.isEmpty ||
-                      editLongitudeController.text.isEmpty ||
-                      editLatitudeController.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('輸入不完整')),
-                    );
-                    return;
-                  }
-
-                  final body = {
-                    'TownID': selectedTown,
-                    'Name': editNameController.text,
-                    'Longitude': double.tryParse(editLongitudeController.text),
-                    'Latitude': double.tryParse(editLatitudeController.text),
-                  };
-
-                  final response = await http.put(
-                    Uri.parse('$baseUrl/youbike/updateYoubike/$ybid'),
-                    headers: {'Content-Type': 'application/json'},
-                    body: jsonEncode(body),
-                  );
-
-                  if (response.statusCode == 200) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('更新成功')),
-                    );
-                    setState(() {
-                      isAdding = false;
-                      editingYBID = null;
-                    });
-                    await fetchYoubikes();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('更新失敗')),
-                    );
-                  }
-                },
-                child: const Text('儲存修改'),
-              ),
-              const SizedBox(width: 20),
-              ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    isAdding = false;
-                    editingYBID = null;
-                  });
-                },
-                child: const Text('取消'),
-              ),
-            ],
-          )
-        ],
-      ),
+    final response = await http.put(
+      Uri.parse('$baseUrl/youbike/updateYoubike/$editingYBID'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
     );
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('修改成功')),
+      );
+      setState(() {
+        isAdding = false;
+        editingYBID = null;
+        nameController.clear();
+        longitudeController.clear();
+        latitudeController.clear();
+      });
+      await fetchYoubikes();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('修改失敗')),
+      );
+    }
   }
-
-
 
 
 
@@ -488,20 +397,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
               child: isLoadingYoubikes
               ? const Center(child: CircularProgressIndicator())
               : isAdding
-                ? _buildInsertForm()
-                : /*editingYBID != null
-                  ? () {
-                    final item = youbikes.firstWhere((e) => e['YBID'] == editingYBID);
-                    return _buildEditForm(
-                      ybid: item['YBID'],
-                      initCity: item['CityID'],
-                      initTown: item['TownID'],
-                      initName: item['Name'],
-                      initLon: item['Longitude'],
-                      initLat: item['Latitude'],
-                    );
-                  }()
-                  : */youbikes.isEmpty
+                ? _youbikeForm()
+                : youbikes.isEmpty
                     ? const Center(child: Text('無 YouBike 站點資料'))
                     : Column(
                       children: [
@@ -522,17 +419,19 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                                       icon: const Icon(Icons.edit, color: Colors.blue),
                                       onPressed: () {
                                         // **********************************************************************************************************************
-                                        showDialog(
-                                          context: context,
-                                          builder: (_) => _buildEditForm(
-                                            ybid: item['YBID'],
-                                            initCity: item['CityID'],
-                                            initTown: item['TownID'],
-                                            initName: item['Name'],
-                                            initLon: item['Longitude'],
-                                            initLat: item['Latitude'],
-                                          ),
-                                        );
+                                        setState(() {
+                                          editingYBID = item['YBID'];
+                                          isAdding = true;
+                                          selectedCity = item['CityID'];
+                                          fetchTowns().then((_) {
+                                            setState(() {
+                                              selectedTown = item['TownID'];
+                                            });
+                                          });
+                                          nameController.text = item['Name'] ?? '';
+                                          longitudeController.text = item['Longitude'].toString();
+                                          latitudeController.text = item['Latitude'].toString();
+                                        });
                                       },
                                     ),
                                     IconButton(
