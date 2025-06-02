@@ -6,6 +6,7 @@ router.get('/', async (req, res, next) => {
     const cityID = req.query.cityid;
     const townID = req.query.townid;
     const crID = req.query.crid;
+    const keyword = req.query.keyword;
 
     let sql = `
         SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName,
@@ -19,8 +20,12 @@ router.get('/', async (req, res, next) => {
         WHERE 1
     `;
     let params = [];
+    
 
-    if (crID) {
+    if (keyword) {
+        sql += ' AND cyclingroute.Name LIKE ?';
+        params = [`%${keyword}%`];
+    } else if (crID) {
         sql += ' AND cyclingroute.CRID = ?';
         params = [crID];
     } else if (townID) {
@@ -56,6 +61,110 @@ router.get('/', async (req, res, next) => {
         console.error(err);
         next(err);
     }
+});
+
+// ✅ Insert cyclingroute
+router.post('/insertCyclingroute', (req, res, next) => {
+  const {
+    CityID,
+    TownID,
+    ManagementID,
+    Name,
+    AlternateNames,
+    Geometry,
+    Start,
+    End,
+    Length,
+    Direction,
+    FinishDate
+  } = req.body;
+
+  if (!CityID || !Name ) {
+    return res.status(400).json({ message: '缺少必要欄位' });
+  }
+
+  const sql = `
+    INSERT INTO cyclingroute 
+    (CityID, TownID, Name, AlternateNames, Geometry, Start, End, Length, Direction, FinishDate, ManagementID)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const params = [
+    CityID,
+    TownID || null,
+    Name,
+    AlternateNames || null,
+    Geometry || null,
+    Start || null,
+    End || null,
+    Length || null,
+    Direction || null,
+    FinishDate || null,
+    ManagementID || null,
+  ];
+
+  pool.query(sql, params, (err, result) => {
+    if (err) return next(err);
+    res.json({ message: '新增 CyclingRoute 成功', insertedId: result.insertId });
+  });
+});
+
+
+// ✅ Update cyclingroute
+router.put('/updateCyclingroute/:crid', (req, res, next) => {
+  const crid = req.params.crid;
+  const {
+    CityID,
+    TownID,
+    ManagementID,
+    Name,
+    AlternateNames,
+    Geometry,
+    Start,
+    End,
+    Length,
+    Direction,
+    FinishDate
+  } = req.body;
+
+  const sql = `
+    UPDATE cyclingroute 
+    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?, Geometry = ?, 
+    Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?
+    WHERE CRID = ?
+  `;
+
+    const params = [
+        CityID,
+        TownID || null,
+        Name,
+        AlternateNames || null,
+        Geometry || null,
+        Start || null,
+        End || null,
+        Length || null,
+        Direction || null,
+        FinishDate || null,
+        ManagementID || null,
+        crid,
+    ];
+
+  pool.query(sql, params, (err, result) => {
+    if (err) return next(err);
+    res.json({ message: '更新 CyclingRoute 成功' });
+  });
+});
+
+
+// ✅ Delete cyclingroute
+router.delete('/deleteCyclingroute/:crid', (req, res, next) => {
+  const crid = req.params.crid;
+
+  const sql = 'DELETE FROM cyclingroute WHERE CRID = ?';
+  pool.query(sql, [crid], (err, result) => {
+    if (err) return next(err);
+    res.json({ message: '刪除 CyclingRoute 成功' });
+  });
 });
 
 module.exports = router;
