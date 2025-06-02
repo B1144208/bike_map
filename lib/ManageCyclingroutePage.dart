@@ -11,10 +11,15 @@ class ManageCyclingroutePage extends StatefulWidget {
   State<ManageCyclingroutePage> createState() => _ManageCyclingroutePageState();
 }
 
+
+
 class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   List<dynamic> cities = [];
   List<dynamic> towns = [];
   List<dynamic> cyclingroutes = [];
+  // ******************************************************************************************************
+  List<List<double>> coordinates = [];
+  List<List<double>> temp_coordinates = [];
 
   int? selectedCity;
   int? selectedTown;
@@ -46,6 +51,11 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   final TextEditingController directionController = TextEditingController();
   final TextEditingController finishDateController = TextEditingController();
   final TextEditingController managementIdController = TextEditingController();
+
+  // 點座標 ***********************************************************************************
+  final TextEditingController coordinateLngController = TextEditingController();
+  final TextEditingController coordinateLatController = TextEditingController();
+  
 
   
 
@@ -103,20 +113,78 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final result = jsonDecode(checkRes.body);
       return result[0]['ManagementID']; // 成功找到，直接回傳
     }
-
     // 如果找不到，建立新的
     final createRes = await http.post(
       Uri.parse('$baseUrl/management/insertManagement'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'ManagementName': name}),
     );
-
     if (createRes.statusCode == 200) {
       final created = jsonDecode(createRes.body);
       return created['ManagementID'];
     }
-
     return null; // 建立失敗或發生錯誤
+  }
+
+  void _addCoordinate() {
+    final lng = double.tryParse(coordinateLngController.text);
+    final lat = double.tryParse(coordinateLatController.text);
+    if (lng != null && lat != null) {
+      setState(() {
+        temp_coordinates.add([lng, lat]);
+        coordinateLngController.clear();
+        coordinateLatController.clear();
+      });
+    }
+  }
+
+  void _removeCoordinate(int index) {
+    setState(() {
+      temp_coordinates.removeAt(index);
+    });
+  }
+
+  void _clearCoordinates() {
+    setState(() {
+      temp_coordinates = coordinates;
+    });
+  }
+
+  bool _coordinatesEqual() {
+    if (temp_coordinates.length != coordinates.length) return false;
+    for (int i = 0; i < temp_coordinates.length; i++) {
+      if (temp_coordinates[i][0] != coordinates[i][0] || temp_coordinates[i][1] != coordinates[i][1]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _syncCoordinatesWithServer(int crid) async {
+    if (!_coordinatesEqual()) {
+      await http.delete(Uri.parse('$baseUrl/cyclingroute/deleteRoute/$crid'));
+
+      for (final coord in temp_coordinates) {
+        await http.post(
+          Uri.parse('$baseUrl/cyclingroute/insertPoint'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'CRID': crid,
+            'Longitude': coord[0],
+            'Latitude': coord[1],
+          }),
+        );
+      }
+    }
+  }
+
+  void _loadCoordinatesFromItem(Map<String, dynamic> item) {
+    if (item.containsKey('Coordinates')) {
+      final coordList = item['Coordinates'] as List<dynamic>;
+      final parsed = coordList.map<List<double>>((c) => [c[0] as double, c[1] as double]).toList();
+      setState(() {
+        coordinates = parsed;
+        temp_coordinates = coordinates;
+      });
+    }
   }
 
   // 新增 cyclingroutes
@@ -154,6 +222,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
 
     if (response.statusCode == 200) {
+      final res = jsonDecode(response.body);
+      final insertedId = res['insertedId'];
+
+      await _syncCoordinatesWithServer(insertedId);
       await fetchCyclingroutes();
       _clearForm();
       _scrollController.animateTo(
@@ -210,6 +282,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         curve: Curves.easeOut,
       );
     }
+    await _syncCoordinatesWithServer(editingCRID??0);
   }
 
   // 刪除 cyclingroutes
@@ -303,12 +376,52 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         _buildTextField('Management', managementIdController),
 
         const SizedBox(height: 16),
+
+        const Text('座標點'),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: coordinateLngController,
+                decoration: const InputDecoration(labelText: '經度'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: coordinateLatController,
+                decoration: const InputDecoration(labelText: '緯度'),
+                keyboardType: TextInputType.number,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.green),
+              onPressed: _addCoordinate,
+            )
+          ],
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          itemCount: temp_coordinates.length,
+          itemBuilder: (context, index) {
+            final coord = temp_coordinates[index];
+            return ListTile(
+              title: Text('(${coord[0]}, ${coord[1]})'),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                onPressed: () => _removeCoordinate(index),
+              ),
+            );
+          },
+        ),
+        
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
               onPressed: editingCRID == null ? _submitInsert : _submitUpdate,
-              child: Text(editingCRID == null ? '新增' : '修改'),
+              child: Text(editingCRID == null ? '確認新增' : '確認修改'),
             ),
             const SizedBox(width: 20),
             ElevatedButton(
@@ -403,7 +516,12 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                   const SizedBox(height: 12),
                   isAdding
                       ? _cyclingrouteForm()
-                      : Column(
+                      : cyclingroutes.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.only(top: 30.0),
+                            child: Text('無自行車道資料'),
+                          )
+                        : Column(
                           children: [
                             ListView.builder(
                               shrinkWrap: true,
@@ -436,6 +554,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                                             directionController.text = item['Direction'] ?? '';
                                             finishDateController.text = item['FinishDate'] ?? '';
                                             managementIdController.text = item['ManagementName'] ?? '';
+                                            _loadCoordinatesFromItem(item);
                                           });
                                         },
                                       ),

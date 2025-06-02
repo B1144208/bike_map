@@ -15,6 +15,7 @@ const userRoutes = require('./routes/user');
 const bmybRoutes = require('./routes/bm_yb');
 const bmcrRoutes = require('./routes/bm_cr');
 const managementRoutes = require('./routes/management');
+const pointsRoutes = require('./routes/points');
 
 // 使用路由
 app.use('/city', cityRoutes);
@@ -25,6 +26,7 @@ app.use('/user', userRoutes);
 app.use('/bmyb', bmybRoutes);
 app.use('/bmcr', bmcrRoutes);
 app.use('/management', managementRoutes);
+app.use('/points', pointsRoutes);
 
 // 測試首頁
 app.get('/', (req, res) => {
