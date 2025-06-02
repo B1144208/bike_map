@@ -227,41 +227,6 @@ class _ManageUserPageState extends State<ManageUserPage> {
                   }
 
                   try {
-                    // 調試：印出要發送的資料
-                    print('發送的 payload: ${json.encode(payload)}');
-                    print('URL: ${isEdit ? updateUserUrl(user!['UserID']) : createUserUrl}');
-
-                    final response = isEdit
-                        ? await http.put(
-                      Uri.parse(updateUserUrl(user!['UserID'])),
-                      headers: {'Content-Type': 'application/json'},
-                      body: json.encode(payload),
-                    )
-                        : await http.post(
-                      Uri.parse(createUserUrl),
-                      headers: {'Content-Type': 'application/json'},
-                      body: json.encode(payload),
-                    );
-
-                    // 調試：印出回應內容
-                    print('回應狀態碼: ${response.statusCode}');
-                    print('回應內容: ${response.body}');
-
-                    if (response.statusCode == 200 || response.statusCode == 201) {
-                      Navigator.pop(context);
-                      _fetchUsers();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('操作失敗：${response.statusCode}\n${response.body}')),
-                      );
-                    }
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('錯誤：$e')),
-                    );
-                  }
-
-                  try {
                     final response = isEdit
                         ? await http.put(
                       Uri.parse(updateUserUrl(user!['UserID'])),
