@@ -98,12 +98,22 @@ router.put('/updateUser/:userId', (req, res) => {
     const userId = req.params.userId;
     const { Account, Password, IsManager } = req.body;
 
-    if (!Account || !Password) {
-        return res.status(400).send({ error: 'Account and Password are required' });
+    // 只檢查 Account，不強制要求 Password
+    if (!Account) {
+        return res.status(400).send({ error: 'Account is required' });
     }
 
-    let sql = 'UPDATE user SET Account = ?, Password = ?, IsManager = ? WHERE UserID = ?';
-    let param = [Account, Password, IsManager || 0, userId];
+    let sql, param;
+
+    // 如果有提供密碼，就更新密碼；如果沒有，就不更新密碼
+    if (Password) {
+        sql = 'UPDATE user SET Account = ?, Password = ?, IsManager = ? WHERE UserID = ?';
+        param = [Account, Password, IsManager || 0, userId];
+    } else {
+        sql = 'UPDATE user SET Account = ?, IsManager = ? WHERE UserID = ?';
+        param = [Account, IsManager || 0, userId];
+    }
+
     pool.query(sql, param, (err, result) => {
         if (err) {
             console.error('Error updating user:', err);
