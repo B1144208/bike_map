@@ -614,7 +614,7 @@ class _HomePageState extends State<HomePage>{
                                                 '終　　點: ${data['End'] ?? '無資料'}\n'
                                                 '長　　度: ${data['Length'] ?? '無資料'} 公尺\n'
                                                 '完成日期: ${data['FinishDate'] ?? '無資料'}\n'
-                                                '管理單位: ${data['Management'] ?? '無資料'}\n'
+                                                '管理單位: ${data['ManagementName'] ?? '無資料'}\n'
                                               ),
                                               actions: [
                                                 Row(
