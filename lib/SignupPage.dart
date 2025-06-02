@@ -3,10 +3,11 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 // 連接頁面
+import 'config.dart';
 import 'LoginPage.dart';
 
 Future<bool> insertUser(String account, String password) async{
-  final url = 'http://localhost:3000/user/insertUser';
+  final url = '$baseUrl/user/insertUser';
   
   // Prepare the request body as a Map
   final Map<String, String> body = {
@@ -45,7 +46,7 @@ Future<bool> insertUser(String account, String password) async{
 
 // 判斷帳號是否存在
 Future<bool> checkAccountExist(String username) async {
-  final url = 'http://localhost:3000/user/checkname?account=$username';
+  final url = '$baseUrl/user/checkname?account=$username';
   
   final response = await http.get(Uri.parse(url));
 

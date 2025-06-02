@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 連接頁面
+import 'config.dart';
 import 'SignupPage.dart';
 import 'HomePage.dart';
 import 'AdminPage.dart';
@@ -11,7 +12,7 @@ import 'AdminPage.dart';
 
 // 判斷登入帳號密碼是否正確
 Future<int> checkUserLogin(String username, String password) async {
-  final url = 'http://localhost:3000/user/checkuser?account=$username&password=$password';
+  final url = '$baseUrl/user/checkuser?account=$username&password=$password';
   
   final response = await http.get(Uri.parse(url));
 
@@ -28,7 +29,7 @@ Future<int> checkUserLogin(String username, String password) async {
 
 Future<void> StoreDataInSharedPrederences (int userId) async{
 
-  final userInfoUrl = 'http://localhost:3000/user?userid=$userId';
+  final userInfoUrl = '$baseUrl/user?userid=$userId';
   final userInfoResponse = await http.get(Uri.parse(userInfoUrl));
 
   if(userInfoResponse.statusCode == 200) {

@@ -8,7 +8,7 @@ router.get('/', (req, res, next) => {
     const townId = req.query.townid;
     const ybId = req.query.ybid;
 
-    let sql = 'SELECT * FROM youbike WHERE 1';
+    let sql = 'youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE 1';
     let params = [];
     if(ybId){
         sql = 'SELECT youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE youbike.YBID = ?';

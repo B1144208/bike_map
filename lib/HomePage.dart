@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 連接頁面
+import 'config.dart';
 import 'LoginPage.dart';
 import 'UserPage.dart';
 import 'AdminPage.dart';
@@ -62,7 +63,7 @@ class _HomePageState extends State<HomePage>{
   
   // 獲取 city 資料
   Future<void> fetchCities() async{
-    final response = await http.get(Uri.parse('http://localhost:3000/city'));
+    final response = await http.get(Uri.parse('$baseUrl/city'));
 
     if(response.statusCode == 200){
       setState(() {
@@ -83,7 +84,7 @@ class _HomePageState extends State<HomePage>{
 
     isLoadingTowns = true;
 
-    final response = await http.get(Uri.parse('http://localhost:3000/town?cityid=$selectedCity'));
+    final response = await http.get(Uri.parse('$baseUrl/town?cityid=$selectedCity'));
 
     if(response.statusCode == 200){
       setState(() {
@@ -105,9 +106,9 @@ class _HomePageState extends State<HomePage>{
 
     String url;
     if (selectedTown == null){
-      url = 'http://localhost:3000/youbike?cityid=$selectedCity';
+      url = '$baseUrl/youbike?cityid=$selectedCity';
     }else{
-      url = 'http://localhost:3000/youbike?townid=$selectedTown';
+      url = '$baseUrl/youbike?townid=$selectedTown';
     }
     final response = await http.get(Uri.parse(url));
 
@@ -130,9 +131,9 @@ class _HomePageState extends State<HomePage>{
 
     String url;
     if (selectedTown == null){
-      url = 'http://localhost:3000/cyclingroute?cityid=$selectedCity';
+      url = '$baseUrl/cyclingroute?cityid=$selectedCity';
     }else{
-      url = 'http://localhost:3000/cyclingroute?townid=$selectedTown';
+      url = '$baseUrl/cyclingroute?townid=$selectedTown';
     }
     final response = await http.get(Uri.parse(url));
 
@@ -187,8 +188,8 @@ class _HomePageState extends State<HomePage>{
     final userID = prefs.getInt('UserID') ?? 0;
 
     String url;
-    if(IsYB) url = 'http://localhost:3000/bmyb?userid=$userID&ybid=$BMID';
-    else url = 'http://localhost:3000/bmcr?userid=$userID&crid=$BMID';
+    if(IsYB) url = '$baseUrl/bmyb?userid=$userID&ybid=$BMID';
+    else url = '$baseUrl/bmcr?userid=$userID&crid=$BMID';
 
     final response = await http.get(Uri.parse(url));
 
@@ -208,8 +209,8 @@ class _HomePageState extends State<HomePage>{
 
   Future<bool> insertBookmark(int userID, int BMID, bool IsYB) async {
     String url;
-    if(IsYB) url = 'http://localhost:3000/bmyb/insertBMYB';
-    else url = 'http://localhost:3000/bmcr/insertBMCR';
+    if(IsYB) url = '$baseUrl/bmyb/insertBMYB';
+    else url = '$baseUrl/bmcr/insertBMCR';
 
     // Prepare the request body as a Map
     final Map<String, int> body = {
@@ -247,8 +248,8 @@ class _HomePageState extends State<HomePage>{
 
   Future<bool> removeBookmark(int userID, int BMID, bool IsYB) async {
     String url;
-    if(IsYB) url = 'http://localhost:3000/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
-    else url = 'http://localhost:3000/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
+    if(IsYB) url = '$baseUrl/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
+    else url = '$baseUrl/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
     final response = await http.delete(Uri.parse(url));
 
     if(response.statusCode == 200){

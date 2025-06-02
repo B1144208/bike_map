@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // 連接頁面
+import 'config.dart';
 import 'HomePage.dart';
 import 'BookmarkPage.dart';
 
@@ -19,7 +20,7 @@ Future<int> searchUserID() async{
 }
 
 Future<bool> removAccount(int userID) async{
-  final url = 'http://localhost:3000/user/deleteUser/$userID';
+  final url = '$baseUrl/user/deleteUser/$userID';
   final response = await http.delete(Uri.parse(url));
 
   if(response.statusCode == 200){

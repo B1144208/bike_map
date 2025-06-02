@@ -4,13 +4,15 @@ import 'package:project/UserPage.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
+//連結頁面
+import 'config.dart';
 
 Future<bool> insertBookmark(int BMID, bool IsYB) async {
   String url;
   final userID = await searchUserID();
 
-  if(IsYB) url = 'http://localhost:3000/bmyb/insertBMYB';
-  else url = 'http://localhost:3000/bmcr/insertBMCR';
+  if(IsYB) url = '$baseUrl/bmyb/insertBMYB';
+  else url = '$baseUrl/bmcr/insertBMCR';
 
   // Prepare the request body as a Map
   final Map<String, int> body = {
@@ -50,8 +52,8 @@ Future<bool> removeBookmark(int BMID, bool IsYB) async {
   String url;
   final userID = await searchUserID();
 
-  if(IsYB) url = 'http://localhost:3000/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
-  else url = 'http://localhost:3000/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
+  if(IsYB) url = '$baseUrl/bmyb/deleteBMYB?userid=$userID&ybid=$BMID';
+  else url = '$baseUrl/bmcr/deleteBMCR?userid=$userID&crid=$BMID';
   final response = await http.delete(Uri.parse(url));
   
   if(response.statusCode == 200){
@@ -87,8 +89,8 @@ class _BookmarkPageState extends State<BookmarkPage>{
 
   Future<void> FetchBookmark(int userID, bool IsYB) async {
     String url;
-    if(IsYB) url = 'http://localhost:3000/bmyb?userid=$userID';
-    else url = 'http://localhost:3000/bmcr?userid=$userID';
+    if(IsYB) url = '$baseUrl/bmyb?userid=$userID';
+    else url = '$baseUrl/bmcr?userid=$userID';
 
     final response = await http.get(Uri.parse(url));
 
