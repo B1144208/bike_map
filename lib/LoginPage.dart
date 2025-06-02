@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // 連接頁面
 import 'SignupPage.dart';
 import 'HomePage.dart';
+import 'AdminPage.dart';
 
 
 // 判斷登入帳號密碼是否正確
@@ -22,6 +23,8 @@ Future<int> checkUserLogin(String username, String password) async {
     return 0;
   }
 }
+
+
 
 Future<void> StoreDataInSharedPrederences (int userId) async{
 
@@ -60,6 +63,25 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _obscureText = true;         // 控制密碼的顯示/隱藏
   String PromptMessage = "";
+
+    Future<void> _checkManager() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userID = prefs.getInt('UserID');
+
+    if(userID != null){
+      final isManager = prefs.getInt('IsManager') ?? 0;
+      if (isManager==0) return;
+    
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminPage()),
+        );
+        
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context){
@@ -161,6 +183,7 @@ class _LoginPageState extends State<LoginPage> {
                   if(userId!=0){
                     setState(() {
                       PromptMessage = "成功登入!";
+                      _checkManager();
                     });
 
                     // 儲存帳號資料至shared_preferences

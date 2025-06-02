@@ -11,13 +11,13 @@ router.get('/', (req, res, next) => {
     let sql = 'SELECT * FROM youbike WHERE 1';
     let params = [];
     if(ybId){
-        sql = 'SELECT YBID, youbike.CityID, CityName, youbike.TownID, TownName, Name, Longitude, Latitude FROM youbike, city, town WHERE YBID=? and youbike.CityID=city.CityID and youbike.TownID=town.TownID';
+        sql = 'SELECT youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE youbike.YBID = ?';
         params = [ybId];
     }else if(townId){
-        sql = 'SELECT YBID, youbike.CityID, CityName, youbike.TownID, TownName, Name, Longitude, Latitude FROM youbike, city, town WHERE youbike.TownID=? and youbike.CityID=city.CityID and youbike.TownID=town.TownID';
+        sql = 'SELECT  youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE youbike.TownID = ?';
         params = [townId];
     }else if(cityId){
-        sql = 'SELECT YBID, youbike.CityID, CityName, youbike.TownID, TownName, Name, Longitude, Latitude FROM youbike, city, town WHERE youbike.CityID=? and youbike.CityID=city.CityID and youbike.TownID=town.TownID';
+        sql = 'SELECT youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE town.CityID=?';
         params = [cityId];
     }
 

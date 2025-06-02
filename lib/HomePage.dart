@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // 連接頁面
 import 'LoginPage.dart';
 import 'UserPage.dart';
+import 'AdminPage.dart';
 
 Future<bool> IsLogin() async{
   final prefs = await SharedPreferences.getInstance();
@@ -39,6 +40,25 @@ class _HomePageState extends State<HomePage>{
   bool isFavorited = false;                     // bookmark_暫存用
 
   final mapController = MapController();
+
+  Future<void> _checkManager() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userID = prefs.getInt('UserID');
+
+    if(userID != null){
+      final isManager = prefs.getInt('IsManager') ?? 0;
+      if (isManager==0) return;
+    
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminPage()),
+        );
+        
+      });
+    }
+  }
   
   // 獲取 city 資料
   Future<void> fetchCities() async{
@@ -271,6 +291,7 @@ class _HomePageState extends State<HomePage>{
   void initState() {
     super.initState();
     fetchCities();
+    _checkManager();
   }
 
   @override
@@ -526,12 +547,10 @@ class _HomePageState extends State<HomePage>{
                                                       );
                                                     }
                                                   },
-                                                  child: Image.asset(
-                                                    locallsFavorited
-                                                        ? 'assets/images/heart_filled.png'
-                                                        : 'assets/images/heart_outlined.png',
-                                                    width: 40,
-                                                    height: 40,
+                                                  child: Icon(
+                                                    locallsFavorited ? Icons.favorite : Icons.favorite_border,
+                                                    color: Colors.red,
+                                                    size: 40,
                                                   ),
                                                 ),
                                                 const Spacer(),
@@ -639,12 +658,10 @@ class _HomePageState extends State<HomePage>{
                                                           );
                                                         }
                                                       },
-                                                      child: Image.asset(
-                                                        locallsFavorited
-                                                            ? 'assets/images/heart_filled.png'
-                                                            : 'assets/images/heart_outlined.png',
-                                                        width: 40,
-                                                        height: 40,
+                                                      child: Icon(
+                                                        locallsFavorited ? Icons.favorite : Icons.favorite_border,
+                                                        color: Colors.red,
+                                                        size: 40,
                                                       ),
                                                     ),
                                                     const Spacer(),

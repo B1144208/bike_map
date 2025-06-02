@@ -11,13 +11,13 @@ router.get('/', (req, res, next) => {
     let sql = 'SELECT * FROM cyclingroute WHERE 1';
     let params = [];
     if(crID){
-        sql = 'SELECT * FROM cyclingroute WHERE CRID=?';
+        sql = 'SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName, management.ManagementID, management.ManagementName, cyclingroute.Name, cyclingroute.AlternateNames, cyclingroute.Geometry, cyclingroute.Start, cyclingroute.End, cyclingroute.Length, cyclingroute.Direction, cyclingroute.FinishDate FROM cyclingroute JOIN city ON cyclingroute.CityID = city.CityID JOIN town ON cyclingroute.TownID = town.TownID LEFT JOIN management ON cyclingroute.ManagementID = management.ManagementID WHERE cyclingroute.CRID = ?;';
         params = [crID];
     }else if(townID){
-        sql = 'SELECT * FROM cyclingroute WHERE TownID=?';
+        sql = 'SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName, management.ManagementID, management.ManagementName, cyclingroute.Name, cyclingroute.AlternateNames, cyclingroute.Geometry, cyclingroute.Start, cyclingroute.End, cyclingroute.Length, cyclingroute.Direction, cyclingroute.FinishDate FROM cyclingroute JOIN city ON cyclingroute.CityID = city.CityID JOIN town ON cyclingroute.TownID = town.TownID LEFT JOIN management ON cyclingroute.ManagementID = management.ManagementID WHERE cyclingroute.TownID = ?;';
         params = [townID];
     }else if(cityID){
-        sql = 'SELECT * FROM cyclingroute WHERE CityID=?';
+        sql = 'SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName, management.ManagementID, management.ManagementName, cyclingroute.Name, cyclingroute.AlternateNames, cyclingroute.Geometry, cyclingroute.Start, cyclingroute.End, cyclingroute.Length, cyclingroute.Direction, cyclingroute.FinishDate FROM cyclingroute JOIN city ON cyclingroute.CityID = city.CityID JOIN town ON cyclingroute.TownID = town.TownID LEFT JOIN management ON cyclingroute.ManagementID = management.ManagementID WHERE cyclingroute.CityID = ?;';
         params = [cityID];
     }
 
