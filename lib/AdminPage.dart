@@ -6,6 +6,7 @@ import 'ManageUserPage.dart';
 import 'ManageCityTownPage.dart';
 import 'ManageYoubikePage.dart';
 import 'ManageCyclingroutePage.dart';
+import 'HomePage.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -15,6 +16,12 @@ class AdminPage extends StatefulWidget {
 }
 
 class _AdminPageState extends State<AdminPage> {
+
+  Future<void> SignOut() async{
+    final prefs = await SharedPreferences.getInstance();
+    prefs.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -25,7 +32,7 @@ class _AdminPageState extends State<AdminPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ElevatedButton(
+            FilledButton(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -45,7 +52,7 @@ class _AdminPageState extends State<AdminPage> {
               child: const Text('管理 City / Town 資料'),
             ),
             const SizedBox(height: 12),
-            ElevatedButton(
+            FilledButton(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -64,6 +71,47 @@ class _AdminPageState extends State<AdminPage> {
               },
               child: const Text('管理 CyclingRoute 資料'),
             ),
+            const SizedBox(height: 24),
+            MouseRegion(
+              cursor: SystemMouseCursors.click, // 滑鼠變成手指
+              child: GestureDetector(
+                onTap: () {
+                  SignOut();
+
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        title: const Text('通知'),
+                        content: const Text('帳號已登出'),
+                        actions: <Widget>[
+                          TextButton(
+                            child: const Text('確定'),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (context) => HomePage()),
+                              );
+                            },
+                          ),
+                        ],
+                      );
+                    },
+                  );
+
+                },
+                child: Text(
+                  "登出",
+                  style: TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.deepPurple,
+                  ),
+                  
+                ),
+              ),
+            )
+            
           ],
         ),
       ),
