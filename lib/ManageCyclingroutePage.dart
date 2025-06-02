@@ -92,8 +92,48 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     }
   }
 
+  // 確認是否有 Management
+  Future<int?> checkOrCreateManagement(String name) async {
+    final encodedName = Uri.encodeComponent(name);
+    final checkUrl = Uri.parse('$baseUrl/management?name=$encodedName');
+
+    final checkRes = await http.get(checkUrl);
+
+    if (checkRes.statusCode == 200) {
+      final result = jsonDecode(checkRes.body);
+      return result[0]['ManagementID']; // 成功找到，直接回傳
+    }
+
+    // 如果找不到，建立新的
+    final createRes = await http.post(
+      Uri.parse('$baseUrl/management/insertManagement'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'ManagementName': name}),
+    );
+
+    if (createRes.statusCode == 200) {
+      final created = jsonDecode(createRes.body);
+      return created['ManagementID'];
+    }
+
+    return null; // 建立失敗或發生錯誤
+  }
+
   // 新增 cyclingroutes
   Future<void> _submitInsert() async {
+    final managementName = managementIdController.text.trim();
+    int? managementID;
+
+    if (managementName.isNotEmpty) {
+      managementID = await checkOrCreateManagement(managementName);
+      if (managementID == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('無法新增管理單位')),
+        );
+        return;
+      }
+    }
+
     final body = {
       'CityID': selectedCity,
       'TownID': selectedTown,
@@ -104,7 +144,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Length': double.tryParse(lengthController.text),
       'Direction': directionController.text,
       'FinishDate': finishDateController.text,
-      'ManagementID': int.tryParse(managementIdController.text),
+      'ManagementID': managementID,
     };
 
     final response = await http.post(
@@ -127,6 +167,20 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   // 編輯 cyclingroutes
   Future<void> _submitUpdate() async {
     if (editingCRID == null) return;
+
+    final managementName = managementIdController.text.trim();
+    int? managementID;
+
+    if (managementName.isNotEmpty) {
+      managementID = await checkOrCreateManagement(managementName);
+      if (managementID == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('無法新增管理單位')),
+        );
+        return;
+      }
+    }
+    
     final body = {
       'CityID': selectedCity,
       'TownID': selectedTown,
@@ -137,7 +191,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Length': double.tryParse(lengthController.text),
       'Direction': directionController.text,
       'FinishDate': finishDateController.text,
-      'ManagementID': int.tryParse(managementIdController.text),
+      'ManagementID': managementID,
     };
 
     final response = await http.put(
@@ -157,6 +211,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       );
     }
   }
+
   // 刪除 cyclingroutes
   Future<void> _deleteCyclingroute(int crid) async {
     final response = await http.delete(
@@ -172,12 +227,17 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       isAdding = false;
       editingCRID = null;
       nameController.clear();
+      alternateNamesController.clear();
+      startController.clear();
+      endController.clear();
       lengthController.clear();
       directionController.clear();
+      finishDateController.clear();
+      managementIdController.clear();
     });
   }
 
-   Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false}) {
+  Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
       child: SizedBox(
@@ -240,6 +300,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         _buildTextField('Length', lengthController, isNumber: true),
         _buildTextField('Direction', directionController),
         _buildTextField('FinishDate', finishDateController),
+        _buildTextField('Management', managementIdController),
 
         const SizedBox(height: 16),
         Row(
@@ -327,8 +388,13 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                             isAdding = true;
                             editingCRID = null;
                             nameController.clear();
+                            alternateNamesController.clear();
+                            startController.clear();
+                            endController.clear();
                             lengthController.clear();
                             directionController.clear();
+                            finishDateController.clear();
+                            managementIdController.clear();
                           });
                         },
                       ),
@@ -363,8 +429,13 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                                               });
                                             });
                                             nameController.text = item['Name'] ?? '';
+                                            alternateNamesController.text = item['AlternateNames'] ?? '';
+                                            startController.text = item['Start'] ?? '';
+                                            endController.text = item['End'] ?? '';
                                             lengthController.text = item['Length']?.toString() ?? '';
                                             directionController.text = item['Direction'] ?? '';
+                                            finishDateController.text = item['FinishDate'] ?? '';
+                                            managementIdController.text = item['ManagementName'] ?? '';
                                           });
                                         },
                                       ),
