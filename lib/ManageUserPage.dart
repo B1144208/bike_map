@@ -185,22 +185,44 @@ class _ManageUserPageState extends State<ManageUserPage> {
                   decoration: const InputDecoration(labelText: '密碼'),
                   obscureText: true,
                 ),
-                DropdownButton<int>(
-                  value: managerLevel,
-                  items: isEdit ? const [
-                    DropdownMenuItem(value: 2, child: Text('超級管理員')),
-                    DropdownMenuItem(value: 1, child: Text('管理員')),
-                    DropdownMenuItem(value: 0, child: Text('一般用戶')),
-                  ]
-                      : const[
-                    DropdownMenuItem(value: 0, child: Text('一般用戶')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => managerLevel = value);
-                    }
-                  },
-                ),
+                // 權限選單顯示邏輯：
+                // 1. 新增時：不顯示選單，固定為一般用戶
+                // 2. 編輯時管理員：不顯示選單（無法修改權限）
+                // 3. 編輯時超級管理員：顯示完整選單
+                if (!isEdit) ...[
+                  // 新增模式：不顯示選單，固定為一般用戶
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      '權限等級：一般用戶',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  ),
+                ] else if (_currentUserManager == 2) ...[
+                  // 編輯模式 + 超級管理員：顯示完整選單
+                  DropdownButton<int>(
+                    value: managerLevel,
+                    items: const [
+                      DropdownMenuItem(value: 2, child: Text('超級管理員')),
+                      DropdownMenuItem(value: 1, child: Text('管理員')),
+                      DropdownMenuItem(value: 0, child: Text('一般用戶')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setDialogState(() => managerLevel = value);
+                      }
+                    },
+                  ),
+                ] else ...[
+                  // 編輯模式 + 管理員：只顯示當前權限，無法修改
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      '權限等級：${_managerLabel(managerLevel)}',
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                  ),
+                ],
               ],
             ),
             actions: [
