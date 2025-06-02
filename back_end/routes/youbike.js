@@ -8,16 +8,27 @@ router.get('/', (req, res, next) => {
     const townId = req.query.townid;
     const ybId = req.query.ybid;
 
-    let sql = 'youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE 1';
+    let sql = `
+    SELECT 
+        youbike.YBID, town.CityID, city.CityName, 
+        youbike.TownID, town.TownName, 
+        youbike.Name, youbike.Longitude, youbike.Latitude 
+    FROM youbike 
+    JOIN town ON youbike.TownID = town.TownID 
+    JOIN city ON town.CityID = city.CityID 
+    WHERE 1
+    `;
+
     let params = [];
-    if(ybId){
-        sql = 'SELECT youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE youbike.YBID = ?';
+
+    if (ybId) {
+        sql += ' AND youbike.YBID = ?';
         params = [ybId];
-    }else if(townId){
-        sql = 'SELECT  youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE youbike.TownID = ?';
+    } else if (townId) {
+        sql += ' AND youbike.TownID = ?';
         params = [townId];
-    }else if(cityId){
-        sql = 'SELECT youbike.YBID, town.CityID, city.CityName, youbike.TownID, town.TownName, youbike.Name, youbike.Longitude, youbike.Latitude FROM youbike JOIN town ON youbike.TownID = town.TownID JOIN city ON town.CityID = city.CityID WHERE town.CityID=?';
+    } else if (cityId) {
+        sql += ' AND town.CityID = ?';
         params = [cityId];
     }
 
@@ -27,6 +38,52 @@ router.get('/', (req, res, next) => {
             return next(err);
         }
         res.json(result);
+    });
+});
+
+// Insert a youbike
+router.post('/insertYoubike', (req, res, next) => {
+    const { TownID, Name, Longitude, Latitude } = req.body;
+
+    if (!TownID || !Name || !Longitude || !Latitude) {
+        return res.status(400).json({ message: '缺少必要欄位' });
+    }
+
+    const sql = 'INSERT INTO youbike (TownID, Name, Longitude, Latitude) VALUES (?, ?, ?, ?)';
+    const params = [TownID, Name, Longitude, Latitude];
+
+    pool.query(sql, params, (err, result) => {
+        if (err) return next(err);
+        res.json({ message: '新增 Youbike 成功', insertedId: result.insertId });
+    });
+});
+
+// Update a youbike
+router.put('/updateYoubike/:ybid', (req, res, next) => {
+    const ybid = req.params.ybid;
+    const { TownID, Name, Longitude, Latitude } = req.body;
+
+    const sql = `
+        UPDATE youbike 
+        SET TownID = ?, Name = ?, Longitude = ?, Latitude = ?
+        WHERE YBID = ?
+    `;
+    const params = [TownID, Name, Longitude, Latitude, ybid];
+
+    pool.query(sql, params, (err, result) => {
+        if (err) return next(err);
+        res.json({ message: '更新 Youbike 成功' });
+    });
+});
+
+// Delete a youbike
+router.delete('/deleteYoubike/:ybid', (req, res, next) => {
+    const ybid = req.params.ybid;
+
+    const sql = 'DELETE FROM youbike WHERE YBID = ?';
+    pool.query(sql, [ybid], (err, result) => {
+        if (err) return next(err);
+        res.json({ message: '刪除 Youbike 成功' });
     });
 });
 

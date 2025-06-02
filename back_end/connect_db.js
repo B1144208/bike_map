@@ -6,7 +6,7 @@ const pool = mysql.createPool({
     password: '12345678',
     database: 'bike',
     waitForConnections: true,
-    connectionLimit: 10,  // 最大連接數
+    connectionLimit: 100,  // 最大連接數
     queueLimit: 0         // 排隊請求的最大數量
 })
 
