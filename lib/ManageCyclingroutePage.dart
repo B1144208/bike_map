@@ -19,7 +19,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   List<dynamic> cyclingroutes = [];
   // ******************************************************************************************************
   List<List<double>> coordinates = [];
-  List<List<double>> temp_coordinates = [];
 
   int? selectedCity;
   int? selectedTown;
@@ -131,7 +130,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     final lat = double.tryParse(coordinateLatController.text);
     if (lng != null && lat != null) {
       setState(() {
-        temp_coordinates.add([lng, lat]);
+        coordinates.add([lng, lat]);
         coordinateLngController.clear();
         coordinateLatController.clear();
       });
@@ -140,42 +139,60 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
 
   void _removeCoordinate(int index) {
     setState(() {
-      temp_coordinates.removeAt(index);
+      coordinates.removeAt(index);
     });
   }
 
   void _clearCoordinates() {
     setState(() {
-      temp_coordinates = coordinates;
+      coordinates = coordinates;
     });
   }
 
-  bool _coordinatesEqual() {
-    print("${temp_coordinates.length}\t${coordinates.length}");
-    if (temp_coordinates.length != coordinates.length) return false;
-    print("222222222222222222222222");
-    for (int i = 0; i < temp_coordinates.length; i++) {
-      if (temp_coordinates[i][0] != coordinates[i][0] || temp_coordinates[i][1] != coordinates[i][1]) return false;
+  Future<bool> _coordinatesEqual(int crid) async {
+    final response = await http.get(Uri.parse('$baseUrl/points?crid=$crid'));
+    if (response.statusCode != 200) return false;
+
+    final List<dynamic> rawPoints = jsonDecode(response.body);
+    final List<List<double>> dbCoords = rawPoints
+        .map<List<double>>((p) => [p['Longitude'] * 1.0, p['Latitude'] * 1.0])
+        .toList();
+
+    if (dbCoords.length != coordinates.length) return false;
+
+    for (int i = 0; i < dbCoords.length; i++) {
+      if (dbCoords[i][0] != coordinates[i][0] ||
+          dbCoords[i][1] != coordinates[i][1]) {
+        return false;
+      }
     }
+
     return true;
   }
 
   Future<void> _syncCoordinatesWithServer(int crid) async {
-    final equal = _coordinatesEqual();
-    print("$equal");
+    final equal = await _coordinatesEqual(crid);
+    print("equal: $equal");
     if (!equal) {
       await http.delete(Uri.parse('$baseUrl/points/deleteRoute/$crid'));
 
-      for (final coord in temp_coordinates) {
-        await http.post(
-          Uri.parse('$baseUrl/points/insertPoint'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'CRID': crid,
-            'Longitude': coord[0],
-            'Latitude': coord[1],
-          }),
-        );
+      for (final coord in coordinates) {
+        final lng = double.tryParse(coord[0].toString());
+        final lat = double.tryParse(coord[1].toString());
+
+        if (lng != null && lat != null) {
+          await http.post(
+            Uri.parse('$baseUrl/points/insertPoint'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'CRID': crid,
+              'Longitude': lng,
+              'Latitude': lat,
+            }),
+          );
+        } else {
+          print('轉換失敗，輸入不是數字: lng=$lng, lat=$lat');
+        }
       }
     }
   }
@@ -186,7 +203,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final parsed = coordList.map<List<double>>((c) => [c[0] as double, c[1] as double]).toList();
       setState(() {
         coordinates = parsed;
-        temp_coordinates = coordinates;
+        coordinates = coordinates;
       });
     }
   }
@@ -229,7 +246,26 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final res = jsonDecode(response.body);
       final insertedId = res['insertedId'];
 
-      await _syncCoordinatesWithServer(insertedId);
+      
+      for (final coord in coordinates) {
+        final lng = double.tryParse(coord[0].toString());
+        final lat = double.tryParse(coord[1].toString());
+
+        if (lng != null && lat != null) {
+          await http.post(
+            Uri.parse('$baseUrl/points/insertPoint'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'CRID': insertedId,
+              'Longitude': lng,
+              'Latitude': lat,
+            }),
+          );
+        } else {
+          print('轉換失敗，輸入不是數字: lng=$lng, lat=$lat');
+        }
+      }
+
       await fetchCyclingroutes();
       _clearForm();
       _scrollController.animateTo(
@@ -242,6 +278,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
 
   // 編輯 cyclingroutes
   Future<void> _submitUpdate() async {
+    // ***************************************************************************************************
+    print("_submitUpdate(): $editingCRID");
     if (editingCRID == null) return;
 
     final managementName = managementIdController.text.trim();
@@ -286,6 +324,11 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         curve: Curves.easeOut,
       );
     }
+
+    final item = cyclingroutes.firstWhere(
+      (e) => e['CRID'] == editingCRID,
+      orElse: () => {},
+    );
     await _syncCoordinatesWithServer(editingCRID??0);
   }
 
@@ -432,9 +475,9 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         ),
         ListView.builder(
           shrinkWrap: true,
-          itemCount: temp_coordinates.length,
+          itemCount: coordinates.length,
           itemBuilder: (context, index) {
-            final coord = temp_coordinates[index];
+            final coord = coordinates[index];
             return ListTile(
               title: Text('(${coord[0]}, ${coord[1]})'),
               trailing: IconButton(
