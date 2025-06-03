@@ -46,6 +46,9 @@ class _HomePageState extends State<HomePage> {
   final int itemsPerPage = 20;
   int currentPage = 0;
 
+  // 搜尋關鍵字 - 新增這行
+  final TextEditingController keywordController = TextEditingController();
+
   final mapController = MapController();
 
   // 取得當前頁面的項目
@@ -127,14 +130,26 @@ class _HomePageState extends State<HomePage> {
   Future<void> fetchYoubikes() async {
     setState(() => isLoadingYoubikes = true);
 
-    String url;
-    if (selectedCity == null) {
-      url = '$baseUrl/youbike';
-    } else if (selectedTown == null) {
-      url = '$baseUrl/youbike?cityid=$selectedCity';
+    String url = '$baseUrl/youbike';
+    final keyword = keywordController.text.trim();
+
+    // 構建查詢參數
+    List<String> queryParams = [];
+
+    if (keyword.isNotEmpty) {
+      queryParams.add('keyword=$keyword');
     } else {
-      url = '$baseUrl/youbike?townid=$selectedTown';
+      if (selectedTown != null) {
+        queryParams.add('townid=$selectedTown');
+      } else if (selectedCity != null) {
+        queryParams.add('cityid=$selectedCity');
+      }
     }
+
+    if (queryParams.isNotEmpty) {
+      url += '?${queryParams.join('&')}';
+    }
+
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -153,14 +168,26 @@ class _HomePageState extends State<HomePage> {
 
   // 獲取 cyclingroute 資料
   Future<void> fetchCyclingRoutes() async {
-    String url;
-    if (selectedCity == null) {
-      url = '$baseUrl/cyclingroute';
-    } else if (selectedTown == null) {
-      url = '$baseUrl/cyclingroute?cityid=$selectedCity';
+    String url = '$baseUrl/cyclingroute';
+    final keyword = keywordController.text.trim();
+
+    // 構建查詢參數
+    List<String> queryParams = [];
+
+    if (keyword.isNotEmpty) {
+      queryParams.add('keyword=$keyword');
     } else {
-      url = '$baseUrl/cyclingroute?townid=$selectedTown';
+      if (selectedTown != null) {
+        queryParams.add('townid=$selectedTown');
+      } else if (selectedCity != null) {
+        queryParams.add('cityid=$selectedCity');
+      }
     }
+
+    if (queryParams.isNotEmpty) {
+      url += '?${queryParams.join('&')}';
+    }
+
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -191,7 +218,7 @@ class _HomePageState extends State<HomePage> {
 
   // 修改：只在選擇城市後才載入資料
   Future<void> loadAllData() async {
-    if (selectedCity != null) {
+    if (selectedCity != null || keywordController.text.trim().isNotEmpty) {
       await fetchYoubikes();
       await fetchCyclingRoutes();
     }
@@ -555,12 +582,34 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 10),
 
+                      // 關鍵字搜尋 - 新增的部分
+                      TextField(
+                        controller: keywordController,
+                        decoration: const InputDecoration(
+                          hintText: '輸入關鍵字搜尋',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.search),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          // 可以在這裡添加即時搜尋功能，如果需要的話
+                        },
+                      ),
+                      const SizedBox(height: 10),
+
                       // 搜尋按鈕
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed:
-                              (selectedCity == null || isLoadingYoubikes)
+                              (selectedCity == null &&
+                                          keywordController.text
+                                              .trim()
+                                              .isEmpty) ||
+                                      isLoadingYoubikes
                                   ? null
                                   : () async {
                                     setState(() => currentPage = 0);
@@ -585,19 +634,20 @@ class _HomePageState extends State<HomePage> {
                 // 列表區域
                 Expanded(
                   child:
-                      selectedCity == null
+                      selectedCity == null &&
+                              keywordController.text.trim().isEmpty
                           ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  Icons.location_city,
+                                  Icons.search,
                                   size: 64,
                                   color: Colors.grey[400],
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  '請先選擇城市',
+                                  '請選擇城市或輸入關鍵字搜尋',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: Colors.grey[600],
@@ -725,8 +775,9 @@ class _HomePageState extends State<HomePage> {
 
                 //第10段
 
-                // YouBike 標記 - 只在選擇城市後顯示
-                if (selectedCity != null)
+                // YouBike 標記 - 只在選擇城市或有關鍵字後顯示
+                if (selectedCity != null ||
+                    keywordController.text.trim().isNotEmpty)
                   MarkerLayer(
                     markers:
                         youbikes.map<Marker>((youbikePoint) {
@@ -874,8 +925,9 @@ class _HomePageState extends State<HomePage> {
 
                 //第11段
 
-                // CyclingRoute 起始點標記 - 只在選擇城市後顯示
-                if (selectedCity != null)
+                // CyclingRoute 起始點標記 - 只在選擇城市或有關鍵字後顯示
+                if (selectedCity != null ||
+                    keywordController.text.trim().isNotEmpty)
                   MarkerLayer(
                     markers:
                         cyclingroutes.map((routeItem) {
@@ -1024,8 +1076,9 @@ class _HomePageState extends State<HomePage> {
                         }).toList(),
                   ),
 
-                // CyclingRoute 路線 - 只在選擇城市後顯示
-                if (selectedCity != null)
+                // CyclingRoute 路線 - 只在選擇城市或有關鍵字後顯示
+                if (selectedCity != null ||
+                    keywordController.text.trim().isNotEmpty)
                   PolylineLayer(
                     polylines:
                         cyclingroutes.map<Polyline>((route) {
