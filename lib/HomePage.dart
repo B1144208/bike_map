@@ -137,6 +137,8 @@ class _HomePageState extends State<HomePage> {
     List<String> queryParams = [];
 
     if (keyword.isNotEmpty) {
+      url += '?keyword=$keyword';
+    } else if (keyword.isNotEmpty) {
       queryParams.add('keyword=$keyword');
     } else {
       if (selectedTown != null) {
@@ -175,13 +177,11 @@ class _HomePageState extends State<HomePage> {
     List<String> queryParams = [];
 
     if (keyword.isNotEmpty) {
-      queryParams.add('keyword=$keyword');
-    } else {
-      if (selectedTown != null) {
-        queryParams.add('townid=$selectedTown');
-      } else if (selectedCity != null) {
-        queryParams.add('cityid=$selectedCity');
-      }
+      url += '?keyword=$keyword';
+    } else if (selectedTown != null) {
+      url += '?townid=$selectedTown';
+    } else if (selectedCity != null) {
+      url += '?cityid=$selectedCity';
     }
 
     if (queryParams.isNotEmpty) {
@@ -594,9 +594,9 @@ class _HomePageState extends State<HomePage> {
                             vertical: 8,
                           ),
                         ),
-                        onChanged: (value) {
+                        /*onChanged: (value) {
                           // 可以在這裡添加即時搜尋功能，如果需要的話
-                        },
+                        },*/
                       ),
                       const SizedBox(height: 10),
 

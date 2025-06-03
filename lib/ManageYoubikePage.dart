@@ -54,7 +54,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
 
   Future<void> fetchYoubikes() async {
     String url = '$baseUrl/youbike';
-    // ********************************************************************************************
     final keyword = keywordController.text.trim();
     if (keyword.isNotEmpty) {
       url += '?keyword=$keyword';
@@ -377,7 +376,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                   ],
                 ),
                 const SizedBox(width: 30),
-                // ******************************************************************************
                 SizedBox(
                   width: 150,
                   child: TextField(
