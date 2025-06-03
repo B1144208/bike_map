@@ -41,6 +41,8 @@ class _HomePageState extends State<HomePage> {
   bool isLoadingYoubikes = false;
   bool isFavorited = false;
   bool showYoubike = true;
+  int? selectedMarkerId;
+
 
   // 分頁相關
   final int itemsPerPage = 20;
@@ -363,11 +365,16 @@ class _HomePageState extends State<HomePage> {
           subtitle: Text('${item['CityName'] ?? ''} ${item['TownName'] ?? ''}'),
           onTap: () {
             // 點擊後在地圖上定位
-            final lat = double.tryParse(item['Latitude'].toString());
-            final lng = double.tryParse(item['Longitude'].toString());
-            if (lat != null && lng != null) {
-              mapController.move(LatLng(lat, lng), 15.0);
-            }
+            setState(() {
+              selectedMarkerId = int.parse(item['YBID'].toString());
+              // 並定位地圖
+              final lat = double.tryParse(item['Latitude'].toString());
+              final lng = double.tryParse(item['Longitude'].toString());
+              if (lat != null && lng != null) {
+                mapController.move(LatLng(lat, lng), 15.0);
+              }
+            });
+
           },
         ),
       );
@@ -915,9 +922,12 @@ class _HomePageState extends State<HomePage> {
                               },
                               child: Icon(
                                 Icons.location_pin,
-                                color: Colors.red,
+                                color: (selectedMarkerId != null && selectedMarkerId == int.parse(youbikePoint['YBID'].toString()))
+                                    ? Colors.yellow  // 被選中的 Marker 顏色
+                                    : Colors.red,  // 預設顏色
                                 size: 30,
                               ),
+
                             ),
                           );
                         }).toList(),
