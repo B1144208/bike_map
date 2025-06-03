@@ -313,7 +313,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
-
+    await _syncCoordinatesWithServer(editingCRID??0);
     if (response.statusCode == 200) {
       await fetchCyclingroutes();
       setState(() => editingCRID = null);
@@ -329,7 +329,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       (e) => e['CRID'] == editingCRID,
       orElse: () => {},
     );
-    await _syncCoordinatesWithServer(editingCRID??0);
+    //await _syncCoordinatesWithServer();
   }
 
   // 刪除 cyclingroutes

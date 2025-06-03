@@ -5,11 +5,11 @@ const pool = require('../connect_db');
 // GET all points (optionally filter by CRID)
 router.get('/', (req, res, next) => {
     const crid = req.query.crid;
-    let sql = 'SELECT * FROM cyclingroute_point';
-    const params = [];
+    let sql = 'SELECT * FROM cyclingroute_point WHERE 1';
+    let params = [];
 
     if (crid) {
-        sql += ' WHERE CRID = ?';
+        sql += ' AND CRID = ?';
         params = [crid];
     }
 
