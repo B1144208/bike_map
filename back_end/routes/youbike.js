@@ -7,6 +7,7 @@ router.get('/', (req, res, next) => {
     const cityId = req.query.cityid;
     const townId = req.query.townid;
     const ybId = req.query.ybid;
+    const keyword = req.query.keyword;
 
     let sql = `
     SELECT 
@@ -21,7 +22,10 @@ router.get('/', (req, res, next) => {
 
     let params = [];
 
-    if (ybId) {
+    if (keyword) {
+        sql += ' AND youbike.Name LIKE ?';
+        params = [`%${keyword}%`];
+    } else if (ybId) {
         sql += ' AND youbike.YBID = ?';
         params = [ybId];
     } else if (townId) {

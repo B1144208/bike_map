@@ -28,6 +28,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   bool isLoadingYoubikes = true;
   bool isAdding = false;
   
+  // keyword
+  final TextEditingController keywordController = TextEditingController();
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController longitudeController = TextEditingController();
@@ -51,13 +53,17 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   }
 
   Future<void> fetchYoubikes() async {
-    String url;
-    if (selectedCity == null) {
-      url = '$baseUrl/youbike';
+    String url = '$baseUrl/youbike';
+    // ********************************************************************************************
+    final keyword = keywordController.text.trim();
+    if (keyword.isNotEmpty) {
+      url += '?keyword=$keyword';
+    } else if (selectedCity == null) {
+      url += '';
     } else if (selectedTown == null) {
-      url = '$baseUrl/youbike?cityid=$selectedCity';
+      url += 'cityid=$selectedCity';
     } else {
-      url = '$baseUrl/youbike?townid=$selectedTown';
+      url += 'townid=$selectedTown';
     }
 
     final response = await http.get(Uri.parse(url));
@@ -369,6 +375,15 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                       );
                     }),
                   ],
+                ),
+                const SizedBox(width: 30),
+                // ******************************************************************************
+                SizedBox(
+                  width: 150,
+                  child: TextField(
+                    controller: keywordController,
+                    decoration: const InputDecoration(hintText: '輸入關鍵字'),
+                  ),
                 ),
                 const SizedBox(width: 30),
                 ElevatedButton(
