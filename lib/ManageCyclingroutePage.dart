@@ -151,7 +151,9 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   }
 
   bool _coordinatesEqual() {
+    print("${temp_coordinates.length}\t${coordinates.length}");
     if (temp_coordinates.length != coordinates.length) return false;
+    print("222222222222222222222222");
     for (int i = 0; i < temp_coordinates.length; i++) {
       if (temp_coordinates[i][0] != coordinates[i][0] || temp_coordinates[i][1] != coordinates[i][1]) return false;
     }
@@ -159,12 +161,14 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   }
 
   Future<void> _syncCoordinatesWithServer(int crid) async {
-    if (!_coordinatesEqual()) {
-      await http.delete(Uri.parse('$baseUrl/cyclingroute/deleteRoute/$crid'));
+    final equal = _coordinatesEqual();
+    print("$equal");
+    if (!equal) {
+      await http.delete(Uri.parse('$baseUrl/points/deleteRoute/$crid'));
 
       for (final coord in temp_coordinates) {
         await http.post(
-          Uri.parse('$baseUrl/cyclingroute/insertPoint'),
+          Uri.parse('$baseUrl/points/insertPoint'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'CRID': crid,
@@ -308,6 +312,31 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       finishDateController.clear();
       managementIdController.clear();
     });
+  }
+
+  void _confirmDelete(int ybid) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('確認刪除'),
+          content: Text('確定要刪除站點 $ybid 嗎？'),
+          actions: [
+            TextButton(
+              child: const Text('取消'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: const Text('刪除'),
+              onPressed: () async {
+                Navigator.of(context).pop(); // 關閉 dialog
+                await _deleteCyclingroute(ybid);
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false}) {
@@ -560,7 +589,9 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () => _deleteCyclingroute(item['CRID']),
+                                        onPressed: () {
+                                          _confirmDelete(item['CRID']);
+                                        },
                                       )
                                     ],
                                   ),

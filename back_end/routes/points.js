@@ -10,7 +10,7 @@ router.get('/', (req, res, next) => {
 
     if (crid) {
         sql += ' WHERE CRID = ?';
-        params[crid];
+        params = [crid];
     }
 
     pool.query(sql, params, (err, results) => {
