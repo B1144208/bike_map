@@ -42,6 +42,7 @@ class _HomePageState extends State<HomePage> {
   bool isFavorited = false;
   bool showYoubike = true;
   int? selectedMarkerId;
+  int? selectedCyclingRouteId;
 
 
   // 分頁相關
@@ -203,7 +204,7 @@ class _HomePageState extends State<HomePage> {
 
         for (final group in coordinatesGroups) {
           final latLngGroup =
-              group.map<LatLng>((point) => LatLng(point[1], point[0])).toList();
+          group.map<LatLng>((point) => LatLng(point[1], point[0])).toList();
 
           cyclingroutes.add({'data': route, 'latlng': latLngGroup});
         }
@@ -364,17 +365,15 @@ class _HomePageState extends State<HomePage> {
           title: Text(item['Name'] ?? '未命名'),
           subtitle: Text('${item['CityName'] ?? ''} ${item['TownName'] ?? ''}'),
           onTap: () {
-            // 點擊後在地圖上定位
+            // 點擊後在地圖上定位 YouBike 站點
             setState(() {
               selectedMarkerId = int.parse(item['YBID'].toString());
-              // 並定位地圖
               final lat = double.tryParse(item['Latitude'].toString());
               final lng = double.tryParse(item['Longitude'].toString());
               if (lat != null && lng != null) {
                 mapController.move(LatLng(lat, lng), 15.0);
               }
             });
-
           },
         ),
       );
@@ -421,6 +420,35 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           isThreeLine: true,
+          onTap: () {
+            setState(() {
+              // 新增：更新選中的自行車道 ID
+              selectedCyclingRouteId = item['CRID'];
+
+              // 點擊後在地圖上定位到自行車道的起點（此部分已在上次修改中提供）
+              final geometryStr = item['Geometry'];
+              if (geometryStr != null) {
+                try {
+                  final geometry = jsonDecode(geometryStr);
+                  final coordinatesGroups = geometry['coordinates'];
+
+                  if (coordinatesGroups != null && coordinatesGroups.isNotEmpty) {
+                    final firstGroup = coordinatesGroups[0];
+                    if (firstGroup != null && firstGroup.isNotEmpty) {
+                      final startPoint = firstGroup[0]; // [經度, 緯度]
+                      final lat = double.tryParse(startPoint[1].toString());
+                      final lng = double.tryParse(startPoint[0].toString());
+                      if (lat != null && lng != null) {
+                        mapController.move(LatLng(lat, lng), 15.0);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  print('Error parsing Geometry for cycling route: $e');
+                }
+              }
+            });
+          },
         ),
       );
     }
@@ -551,12 +579,12 @@ class _HomePageState extends State<HomePage> {
                                 });
                               },
                               items:
-                                  cities.map<DropdownMenuItem<int>>((city) {
-                                    return DropdownMenuItem<int>(
-                                      value: city['CityID'],
-                                      child: Text(city['CityName']),
-                                    );
-                                  }).toList(),
+                              cities.map<DropdownMenuItem<int>>((city) {
+                                return DropdownMenuItem<int>(
+                                  value: city['CityID'],
+                                  child: Text(city['CityName']),
+                                );
+                              }).toList(),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -612,22 +640,22 @@ class _HomePageState extends State<HomePage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed:
-                              (selectedCity == null &&
-                                          keywordController.text
-                                              .trim()
-                                              .isEmpty) ||
-                                      isLoadingYoubikes
-                                  ? null
-                                  : () async {
-                                    setState(() => currentPage = 0);
-                                    await loadAllData();
-                                  },
-                          child:
+                          (selectedCity == null &&
+                              keywordController.text
+                                  .trim()
+                                  .isEmpty) ||
                               isLoadingYoubikes
-                                  ? const CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  )
-                                  : const Text('搜尋'),
+                              ? null
+                              : () async {
+                            setState(() => currentPage = 0);
+                            await loadAllData();
+                          },
+                          child:
+                          isLoadingYoubikes
+                              ? const CircularProgressIndicator(
+                            strokeWidth: 2,
+                          )
+                              : const Text('搜尋'),
                         ),
                       ),
                     ],
@@ -641,117 +669,117 @@ class _HomePageState extends State<HomePage> {
                 // 列表區域
                 Expanded(
                   child:
-                      selectedCity == null &&
-                              keywordController.text.trim().isEmpty
-                          ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.search,
-                                  size: 64,
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '請選擇城市或輸入關鍵字搜尋',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
+                  selectedCity == null &&
+                      keywordController.text.trim().isEmpty
+                      ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          '請選擇城市或輸入關鍵字搜尋',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                      : Column(
+                    children: [
+                      // 分頁資訊 - 移除類型提示文字
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '第 ${currentPage + 1} 頁 / 共 $totalPages 頁',
                             ),
-                          )
-                          : Column(
+                            Text(
+                              '共 ${showYoubike ? youbikes.length : cyclingroutesdata.length} 筆',
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 項目列表
+                      Expanded(
+                        child:
+                        currentPageItems.isEmpty
+                            ? Center(
+                          child: Column(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
                             children: [
-                              // 分頁資訊 - 移除類型提示文字
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16.0,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      '第 ${currentPage + 1} 頁 / 共 $totalPages 頁',
-                                    ),
-                                    Text(
-                                      '共 ${showYoubike ? youbikes.length : cyclingroutesdata.length} 筆',
-                                    ),
-                                  ],
+                              Icon(
+                                showYoubike
+                                    ? Icons.pedal_bike
+                                    : Icons.route,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '無資料',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
                                 ),
                               ),
-
-                              // 項目列表
-                              Expanded(
-                                child:
-                                    currentPageItems.isEmpty
-                                        ? Center(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                showYoubike
-                                                    ? Icons.pedal_bike
-                                                    : Icons.route,
-                                                size: 64,
-                                                color: Colors.grey[400],
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                '無資料',
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.grey[600],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                        : ListView.builder(
-                                          itemCount: currentPageItems.length,
-                                          itemBuilder: (context, index) {
-                                            final item =
-                                                currentPageItems[index];
-                                            return _buildListItem(item);
-                                          },
-                                        ),
-                              ),
-
-                              // 分頁按鈕
-                              if (currentPageItems.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed:
-                                            currentPage > 0
-                                                ? () => setState(
-                                                  () => currentPage--,
-                                                )
-                                                : null,
-                                        child: const Text('上一頁'),
-                                      ),
-                                      const SizedBox(width: 20),
-                                      ElevatedButton(
-                                        onPressed:
-                                            currentPage < totalPages - 1
-                                                ? () => setState(
-                                                  () => currentPage++,
-                                                )
-                                                : null,
-                                        child: const Text('下一頁'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
                             ],
                           ),
+                        )
+                            : ListView.builder(
+                          itemCount: currentPageItems.length,
+                          itemBuilder: (context, index) {
+                            final item =
+                            currentPageItems[index];
+                            return _buildListItem(item);
+                          },
+                        ),
+                      ),
+
+                      // 分頁按鈕
+                      if (currentPageItems.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton(
+                                onPressed:
+                                currentPage > 0
+                                    ? () => setState(
+                                      () => currentPage--,
+                                )
+                                    : null,
+                                child: const Text('上一頁'),
+                              ),
+                              const SizedBox(width: 20),
+                              ElevatedButton(
+                                onPressed:
+                                currentPage < totalPages - 1
+                                    ? () => setState(
+                                      () => currentPage++,
+                                )
+                                    : null,
+                                child: const Text('下一頁'),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -775,7 +803,7 @@ class _HomePageState extends State<HomePage> {
               children: [
                 TileLayer(
                   urlTemplate:
-                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: const ['a', 'b', 'c'],
                   userAgentPackageName: 'com.example.app',
                 ),
@@ -787,150 +815,150 @@ class _HomePageState extends State<HomePage> {
                     keywordController.text.trim().isNotEmpty)
                   MarkerLayer(
                     markers:
-                        youbikes.map<Marker>((youbikePoint) {
-                          return Marker(
-                            point: LatLng(
-                              double.parse(youbikePoint['Latitude'].toString()),
-                              double.parse(
-                                youbikePoint['Longitude'].toString(),
-                              ),
-                            ),
-                            width: 60,
-                            height: 60,
-                            child: GestureDetector(
-                              onTap: () async {
-                                bool isLog = await IsLogin();
-                                bool locallsFavorited = false;
+                    youbikes.map<Marker>((youbikePoint) {
+                      return Marker(
+                        point: LatLng(
+                          double.parse(youbikePoint['Latitude'].toString()),
+                          double.parse(
+                            youbikePoint['Longitude'].toString(),
+                          ),
+                        ),
+                        width: 60,
+                        height: 60,
+                        child: GestureDetector(
+                          onTap: () async {
+                            bool isLog = await IsLogin();
+                            bool locallsFavorited = false;
 
-                                if (isLog) {
-                                  final BMYBID = await IsBookmarkExist(
-                                    int.parse(youbikePoint['YBID'].toString()),
-                                    true,
-                                  );
-                                  locallsFavorited =
-                                      (BMYBID == 0) ? false : true;
-                                } else {
-                                  locallsFavorited = false;
-                                }
+                            if (isLog) {
+                              final BMYBID = await IsBookmarkExist(
+                                int.parse(youbikePoint['YBID'].toString()),
+                                true,
+                              );
+                              locallsFavorited =
+                              (BMYBID == 0) ? false : true;
+                            } else {
+                              locallsFavorited = false;
+                            }
 
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return StatefulBuilder(
-                                      builder: (context, setStateDialog) {
-                                        return AlertDialog(
-                                          content: Text(
-                                            '城市 : ${youbikePoint['CityName']}\n'
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return StatefulBuilder(
+                                  builder: (context, setStateDialog) {
+                                    return AlertDialog(
+                                      content: Text(
+                                        '城市 : ${youbikePoint['CityName']}\n'
                                             '鄉鎮 : ${youbikePoint['TownName']}\n'
                                             '站點 : ${youbikePoint['Name']}\n',
-                                          ),
-                                          actions: [
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.start,
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () async {
-                                                    bool isLogInner =
-                                                        await IsLogin();
-                                                    if (isLogInner) {
-                                                      await toggleFavorite(
-                                                        youbikePoint['YBID'],
-                                                        true,
-                                                      );
-                                                      setStateDialog(() {
-                                                        locallsFavorited =
-                                                            !locallsFavorited;
-                                                      });
-                                                    } else {
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (
-                                                          BuildContext context,
+                                      ),
+                                      actions: [
+                                        Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () async {
+                                                bool isLogInner =
+                                                await IsLogin();
+                                                if (isLogInner) {
+                                                  await toggleFavorite(
+                                                    youbikePoint['YBID'],
+                                                    true,
+                                                  );
+                                                  setStateDialog(() {
+                                                    locallsFavorited =
+                                                    !locallsFavorited;
+                                                  });
+                                                } else {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (
+                                                        BuildContext context,
                                                         ) {
-                                                          return AlertDialog(
-                                                            title: const Text(
-                                                              '通知',
+                                                      return AlertDialog(
+                                                        title: const Text(
+                                                          '通知',
+                                                        ),
+                                                        content: const Text(
+                                                          '請先登入帳號再繼續',
+                                                        ),
+                                                        actions: <Widget>[
+                                                          TextButton(
+                                                            child:
+                                                            const Text(
+                                                              '取消',
                                                             ),
-                                                            content: const Text(
-                                                              '請先登入帳號再繼續',
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop();
+                                                            },
+                                                          ),
+                                                          TextButton(
+                                                            child:
+                                                            const Text(
+                                                              '確定',
                                                             ),
-                                                            actions: <Widget>[
-                                                              TextButton(
-                                                                child:
-                                                                    const Text(
-                                                                      '取消',
-                                                                    ),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                    context,
-                                                                  ).pop();
-                                                                },
-                                                              ),
-                                                              TextButton(
-                                                                child:
-                                                                    const Text(
-                                                                      '確定',
-                                                                    ),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                    context,
-                                                                  ).pop();
-                                                                  Navigator.push(
-                                                                    context,
-                                                                    MaterialPageRoute(
-                                                                      builder:
-                                                                          (
-                                                                            context,
-                                                                          ) =>
-                                                                              LoginPage(),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop();
+                                                              Navigator.push(
+                                                                context,
+                                                                MaterialPageRoute(
+                                                                  builder:
+                                                                      (
+                                                                      context,
+                                                                      ) =>
+                                                                      LoginPage(),
+                                                                ),
+                                                              );
+                                                            },
+                                                          ),
+                                                        ],
                                                       );
-                                                    }
-                                                  },
-                                                  child: Icon(
-                                                    locallsFavorited
-                                                        ? Icons.favorite
-                                                        : Icons.favorite_border,
-                                                    color: Colors.red,
-                                                    size: 40,
-                                                  ),
-                                                ),
-                                                const Spacer(),
-                                                TextButton(
-                                                  onPressed:
-                                                      () =>
-                                                          Navigator.of(
-                                                            context,
-                                                          ).pop(),
-                                                  child: const Text('關閉'),
-                                                ),
-                                              ],
+                                                    },
+                                                  );
+                                                }
+                                              },
+                                              child: Icon(
+                                                locallsFavorited
+                                                    ? Icons.favorite
+                                                    : Icons.favorite_border,
+                                                color: Colors.red,
+                                                size: 40,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                  Navigator.of(
+                                                    context,
+                                                  ).pop(),
+                                              child: const Text('關閉'),
                                             ),
                                           ],
-                                        );
-                                      },
+                                        ),
+                                      ],
                                     );
                                   },
                                 );
                               },
-                              child: Icon(
-                                Icons.location_pin,
-                                color: (selectedMarkerId != null && selectedMarkerId == int.parse(youbikePoint['YBID'].toString()))
-                                    ? Colors.yellow  // 被選中的 Marker 顏色
-                                    : Colors.red,  // 預設顏色
-                                size: 30,
-                              ),
+                            );
+                          },
+                          child: Icon(
+                            Icons.location_pin,
+                            color: (selectedMarkerId != null && selectedMarkerId == int.parse(youbikePoint['YBID'].toString()))
+                                ? Colors.yellow  // 被選中的 Marker 顏色
+                                : Colors.red,  // 預設顏色
+                            size: 30,
+                          ),
 
-                            ),
-                          );
-                        }).toList(),
+                        ),
+                      );
+                    }).toList(),
                   ),
 
                 //第11段
@@ -940,164 +968,178 @@ class _HomePageState extends State<HomePage> {
                     keywordController.text.trim().isNotEmpty)
                   MarkerLayer(
                     markers:
-                        cyclingroutes.map((routeItem) {
-                          final data = routeItem['data'];
-                          final latlng = routeItem['latlng'];
+                    cyclingroutes.map((routeItem) {
+                      final data = routeItem['data'];
+                      final latlng = routeItem['latlng'];
 
-                          return Marker(
-                            point: latlng[0],
-                            width: 60,
-                            height: 60,
-                            child: GestureDetector(
-                              onTap: () async {
-                                bool isLog = await IsLogin();
-                                bool locallsFavorited = false;
+                      return Marker(
+                        point: latlng[0],
+                        width: 60,
+                        height: 60,
+                        child: GestureDetector(
+                          onTap: () async {
+                            setState(() {
+                              selectedCyclingRouteId = int.parse(data['CRID'].toString());
+                            });
 
-                                if (isLog) {
-                                  final BMCRID = await IsBookmarkExist(
-                                    int.parse(data['CRID'].toString()),
-                                    false,
-                                  );
-                                  locallsFavorited =
-                                      (BMCRID == 0) ? false : true;
-                                } else {
-                                  locallsFavorited = false;
-                                }
+                            bool isLog = await IsLogin();
+                            bool locallsFavorited = false;
 
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return StatefulBuilder(
-                                      builder: (context, setStateDialog) {
-                                        return AlertDialog(
-                                          content: Text(
-                                            '路線名稱: ${data['Name'] ?? '無資料'}\n'
+                            if (isLog) {
+                              final BMCRID = await IsBookmarkExist(
+                                int.parse(data['CRID'].toString()),
+                                false,
+                              );
+                              locallsFavorited =
+                              (BMCRID == 0) ? false : true;
+                            } else {
+                              locallsFavorited = false;
+                            }
+
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return StatefulBuilder(
+                                  builder: (context, setStateDialog) {
+                                    return AlertDialog(
+                                      content: Text(
+                                        '路線名稱: ${data['Name'] ?? '無資料'}\n'
                                             '路線別名: ${data['AlternateNames'] ?? '無資料'}\n'
                                             '起　　點: ${data['Start'] ?? '無資料'}\n'
                                             '終　　點: ${data['End'] ?? '無資料'}\n'
                                             '長　　度: ${data['Length'] ?? '無資料'} 公尺\n'
                                             '完成日期: ${data['FinishDate'] ?? '無資料'}\n'
                                             '管理單位: ${data['ManagementName'] ?? '無資料'}\n',
-                                          ),
-                                          actions: [
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.start,
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () async {
-                                                    bool isLogInner =
-                                                        await IsLogin();
-                                                    if (isLogInner) {
-                                                      await toggleFavorite(
-                                                        data['CRID'],
-                                                        false,
-                                                      );
-                                                      setStateDialog(() {
-                                                        locallsFavorited =
-                                                            !locallsFavorited;
-                                                      });
-                                                    } else {
-                                                      showDialog(
-                                                        context: context,
-                                                        builder: (
-                                                          BuildContext context,
+                                      ),
+                                      actions: [
+                                        Row(
+                                          mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () async {
+                                                bool isLogInner =
+                                                await IsLogin();
+                                                if (isLogInner) {
+                                                  await toggleFavorite(
+                                                    data['CRID'],
+                                                    false,
+                                                  );
+                                                  setStateDialog(() {
+                                                    locallsFavorited =
+                                                    !locallsFavorited;
+                                                  });
+                                                } else {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (
+                                                        BuildContext context,
                                                         ) {
-                                                          return AlertDialog(
-                                                            title: const Text(
-                                                              '通知',
+                                                      return AlertDialog(
+                                                        title: const Text(
+                                                          '通知',
+                                                        ),
+                                                        content: const Text(
+                                                          '請先登入帳號再繼續',
+                                                        ),
+                                                        actions: <Widget>[
+                                                          TextButton(
+                                                            child:
+                                                            const Text(
+                                                              '取消',
                                                             ),
-                                                            content: const Text(
-                                                              '請先登入帳號再繼續',
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop();
+                                                            },
+                                                          ),
+                                                          TextButton(
+                                                            child:
+                                                            const Text(
+                                                              '確定',
                                                             ),
-                                                            actions: <Widget>[
-                                                              TextButton(
-                                                                child:
-                                                                    const Text(
-                                                                      '取消',
-                                                                    ),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                    context,
-                                                                  ).pop();
-                                                                },
-                                                              ),
-                                                              TextButton(
-                                                                child:
-                                                                    const Text(
-                                                                      '確定',
-                                                                    ),
-                                                                onPressed: () {
-                                                                  Navigator.of(
-                                                                    context,
-                                                                  ).pop();
-                                                                  Navigator.push(
-                                                                    context,
-                                                                    MaterialPageRoute(
-                                                                      builder:
-                                                                          (
-                                                                            context,
-                                                                          ) =>
-                                                                              LoginPage(),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
+                                                            onPressed: () {
+                                                              Navigator.of(
+                                                                context,
+                                                              ).pop();
+                                                              Navigator.push(
+                                                                context,
+                                                                MaterialPageRoute(
+                                                                  builder:
+                                                                      (
+                                                                      context,
+                                                                      ) =>
+                                                                      LoginPage(),
+                                                                ),
+                                                              );
+                                                            },
+                                                          ),
+                                                        ],
                                                       );
-                                                    }
-                                                  },
-                                                  child: Icon(
-                                                    locallsFavorited
-                                                        ? Icons.favorite
-                                                        : Icons.favorite_border,
-                                                    color: Colors.red,
-                                                    size: 40,
-                                                  ),
-                                                ),
-                                                const Spacer(),
-                                                TextButton(
-                                                  onPressed:
-                                                      () =>
-                                                          Navigator.of(
-                                                            context,
-                                                          ).pop(),
-                                                  child: const Text('關閉'),
-                                                ),
-                                              ],
+                                                    },
+                                                  );
+                                                }
+                                              },
+                                              child: Icon(
+                                                locallsFavorited
+                                                    ? Icons.favorite
+                                                    : Icons.favorite_border,
+                                                color: Colors.red,
+                                                size: 40,
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                  Navigator.of(
+                                                    context,
+                                                  ).pop(),
+                                              child: const Text('關閉'),
                                             ),
                                           ],
-                                        );
-                                      },
+                                        ),
+                                      ],
                                     );
                                   },
                                 );
                               },
-                              // 修復：使用和紅色圖標完全相同的結構，只改顏色
-                              child: const Icon(
-                                Icons.location_pin,
-                                color: Colors.blue,
-                                size: 30,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                            );
+                          },
+                          // 修復：使用和紅色圖標完全相同的結構，只改顏色
+                          child: Icon(
+                            Icons.location_pin,
+                            color: (selectedCyclingRouteId != null && selectedCyclingRouteId == int.parse(data['CRID'].toString()))
+                                ? Colors.purple // 被選中的 Marker 顏色
+                                : Colors.blue,  // 預設顏色
+                            size: 30,
+                          ),
+
+
+                        ),
+                      );
+                    }).toList(),
                   ),
 
                 // CyclingRoute 路線 - 只在選擇城市或有關鍵字後顯示
-                if (selectedCity != null ||
-                    keywordController.text.trim().isNotEmpty)
+                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
                   PolylineLayer(
-                    polylines:
-                        cyclingroutes.map<Polyline>((route) {
-                          return Polyline(
-                            points: route['latlng'],
-                            strokeWidth: 4,
-                            color: Colors.blue,
-                          );
-                        }).toList(),
+                    polylines: cyclingroutes.map((routeData) {
+                      final routeItem = routeData['data']; // 獲取原始路線資料
+                      final List<LatLng> latlngs = routeData['latlng']; // 獲取路線的座標點
+
+                      // 根據是否為選中的路線來決定線條顏色
+                      Color polylineColor = (routeItem['CRID'] != null && routeItem['CRID'] == selectedCyclingRouteId)
+                          ? Colors.purple // 選中時顯示紫色 (或您喜歡的其他突出顏色)
+                          : Colors.blue; // 預設顏色 (例如藍色)
+
+                      return Polyline(
+                        points: latlngs,
+                        color: polylineColor,
+                        strokeWidth: 4.0, // 線條粗細
+                      );
+                    }).toList(),
                   ),
               ],
             ),
