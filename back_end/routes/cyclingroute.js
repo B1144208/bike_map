@@ -11,7 +11,7 @@ router.get('/', async (req, res, next) => {
     let sql = `
         SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName,
                management.ManagementID, management.ManagementName, cyclingroute.Name,
-               cyclingroute.AlternateNames, cyclingroute.Geometry, cyclingroute.Start,
+               cyclingroute.AlternateNames, cyclingroute.Start,
                cyclingroute.End, cyclingroute.Length, cyclingroute.Direction, cyclingroute.FinishDate
         FROM cyclingroute
         LEFT JOIN city ON cyclingroute.CityID = city.CityID
@@ -71,7 +71,6 @@ router.post('/insertCyclingroute', (req, res, next) => {
     ManagementID,
     Name,
     AlternateNames,
-    Geometry,
     Start,
     End,
     Length,
@@ -85,7 +84,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
 
   const sql = `
     INSERT INTO cyclingroute 
-    (CityID, TownID, Name, AlternateNames, Geometry, Start, End, Length, Direction, FinishDate, ManagementID)
+    (CityID, TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -94,7 +93,6 @@ router.post('/insertCyclingroute', (req, res, next) => {
     TownID || null,
     Name,
     AlternateNames || null,
-    Geometry || null,
     Start || null,
     End || null,
     Length || null,
@@ -119,7 +117,7 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
     ManagementID,
     Name,
     AlternateNames,
-    Geometry,
+    
     Start,
     End,
     Length,
@@ -129,7 +127,7 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
 
   const sql = `
     UPDATE cyclingroute 
-    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?, Geometry = ?, 
+    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?, 
     Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?
     WHERE CRID = ?
   `;
@@ -139,7 +137,6 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
         TownID || null,
         Name,
         AlternateNames || null,
-        Geometry || null,
         Start || null,
         End || null,
         Length || null,

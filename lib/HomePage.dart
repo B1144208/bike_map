@@ -198,16 +198,13 @@ class _HomePageState extends State<HomePage> {
       cyclingroutes.clear();
 
       for (final route in cyclingroutesdata) {
-        final geometryStr = route['Geometry'];
-        final geometry = jsonDecode(geometryStr);
-        final coordinatesGroups = geometry['coordinates'];
+        final coordinates = route['Coordinates'];
 
-        for (final group in coordinatesGroups) {
-          final latLngGroup =
-          group.map<LatLng>((point) => LatLng(point[1], point[0])).toList();
+        final latLngGroup = coordinates
+            .map<LatLng>((point) => LatLng(point[1], point[0]))
+            .toList();
 
-          cyclingroutes.add({'data': route, 'latlng': latLngGroup});
-        }
+        cyclingroutes.add({'data': route, 'latlng': latLngGroup});
       }
 
       setState(() {
@@ -425,26 +422,13 @@ class _HomePageState extends State<HomePage> {
               // 新增：更新選中的自行車道 ID
               selectedCyclingRouteId = item['CRID'];
 
-              // 點擊後在地圖上定位到自行車道的起點（此部分已在上次修改中提供）
-              final geometryStr = item['Geometry'];
-              if (geometryStr != null) {
-                try {
-                  final geometry = jsonDecode(geometryStr);
-                  final coordinatesGroups = geometry['coordinates'];
-
-                  if (coordinatesGroups != null && coordinatesGroups.isNotEmpty) {
-                    final firstGroup = coordinatesGroups[0];
-                    if (firstGroup != null && firstGroup.isNotEmpty) {
-                      final startPoint = firstGroup[0]; // [經度, 緯度]
-                      final lat = double.tryParse(startPoint[1].toString());
-                      final lng = double.tryParse(startPoint[0].toString());
-                      if (lat != null && lng != null) {
-                        mapController.move(LatLng(lat, lng), 15.0);
-                      }
-                    }
-                  }
-                } catch (e) {
-                  print('Error parsing Geometry for cycling route: $e');
+              final coordinates = item['Coordinates'];
+              if (coordinates != null && coordinates.isNotEmpty) {
+                final startPoint = coordinates[0]; // [經度, 緯度]
+                final lat = double.tryParse(startPoint[1].toString());
+                final lng = double.tryParse(startPoint[0].toString());
+                if (lat != null && lng != null) {
+                  mapController.move(LatLng(lat, lng), 15.0);
                 }
               }
             });
