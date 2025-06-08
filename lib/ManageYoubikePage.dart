@@ -23,10 +23,13 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   int? selectedCity;
   int? selectedTown;
   int? editingYBID;
+  LatLng? editYBlatlng;
+  LatLng? tempLatlng;
   bool isLoadingCities = true;
   bool isLoadingTowns = false;
   bool isLoadingYoubikes = true;
   bool isInsertUpdate = false;
+  
   
   // keyword
   final TextEditingController keywordController = TextEditingController();
@@ -60,12 +63,14 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
     final keyword = keywordController.text.trim();
     if (keyword.isNotEmpty) {
       url += '?keyword=$keyword';
-    } else if (selectedCity == null) {
-      url += '';
-    } else if (selectedTown == null) {
-      url += 'cityid=$selectedCity';
-    } else {
-      url += 'townid=$selectedTown';
+    }else{
+      if (selectedCity == null) {}
+      else if (selectedCity != null) {
+        url += '?cityid=$selectedCity';
+      }
+      if (selectedTown != null) {
+        url += '&townid=$selectedTown';  // 使用 '&' 來附加其他參數
+      }
     }
 
     final response = await http.get(Uri.parse(url));
@@ -113,31 +118,39 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       throw Exception('Failed to load towns');
     }
   }
+  // 當經度或緯度改變時更新 tempLatlng
+  void updateLatLngFromTextControllers() {
+    final longitude = double.tryParse(longitudeController.text);
+    final latitude = double.tryParse(latitudeController.text);
+    
+    if (longitude != null && latitude != null) {
+      setState(() {
+        tempLatlng = LatLng(latitude, longitude);
+      });
+    }
+  }
+
+  // 當 tempLatlng 改變時，更新經緯度輸入框
+  void updateTextControllersFromLatLng() {
+    if (tempLatlng != null) {
+      longitudeController.text = tempLatlng!.longitude.toString();
+      latitudeController.text = tempLatlng!.latitude.toString();
+    }
+  }
+  // youbike 標記
   Widget _youbikeMarker() {
-    //if (editingYBID == null) return null;
-
-    // 從 youbikes 清單中找出正在編輯的那一筆
-    final selected = youbikes.firstWhere(
-      (item) => item['YBID'] == editingYBID,
-      orElse: () => null,
-    );
-
-    //if (selected == null) return null;
-
-    final latitude = double.tryParse(selected['Latitude'].toString());
-    final longitude = double.tryParse(selected['Longitude'].toString());
-
-    //if (latitude == null || longitude == null) return null;
-
+    
     return MarkerLayer(
       markers: [
         Marker(
-          point: LatLng(latitude??0, longitude??0),
+          point: editYBlatlng==null? LatLng(0.0, 0.0): editYBlatlng!, // 使用 editYBlatlng 的座標
+          
           width: 60,
           height: 60,
           child: GestureDetector(
             onTap: () {
               // 你可以在這裡加點擊後的邏輯
+              
             },
             child: const Icon(
               Icons.location_pin,
@@ -145,11 +158,24 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
               size: 30,
             ),
           ),
-        )
+        ),
+        // 顯示 tempLatlng 上的綠色標記
+        if (tempLatlng != null)
+          Marker(
+            point: tempLatlng!,
+            width: 60,
+            height: 60,
+            child: const Icon(
+              Icons.location_on,
+              color: Colors.green,
+              size: 30,
+            ),
+          ),
       ],
     );
-   
+    
   }
+
   
   // 新增/編輯 Youbike UI-地圖
   Widget _youbikeMap(){
@@ -158,6 +184,13 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       child: FlutterMap(
         mapController: mapController,
         options: MapOptions(
+          onTap: (tapPosition, point) {
+            // 當地圖被點擊時，儲存點擊的座標並更新 tempLatlng
+            setState(() {
+              tempLatlng = point;  // 儲存點擊的座標
+              updateTextControllersFromLatLng();
+            });
+          },
           initialCameraFit: CameraFit.bounds(
             bounds: LatLngBounds(
               const LatLng(21.8, 119.8),
@@ -173,11 +206,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
             subdomains: const ['a', 'b', 'c'],
             userAgentPackageName: 'com.example.app',
           ),
-
-          //第10段
-
-          // YouBike標記 - 只在選擇城市或有關鍵字後顯示
-          
           _youbikeMarker(),
 
         ],
@@ -235,11 +263,13 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
             controller: longitudeController,
             decoration: const InputDecoration(labelText: '經度'),
             keyboardType: TextInputType.number,
+            onChanged: (_) => updateLatLngFromTextControllers(),
           ),
           TextField(
             controller: latitudeController,
             decoration: const InputDecoration(labelText: '緯度'),
             keyboardType: TextInputType.number,
+            onChanged: (_) => updateLatLngFromTextControllers(),
           ),
           const SizedBox(height: 16),
           _youbikeMap(),
@@ -257,6 +287,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                   setState(() {
                     isInsertUpdate = false;
                     editingYBID = null;
+                    editYBlatlng = null;
                     nameController.clear();
                     longitudeController.clear();
                     latitudeController.clear();
@@ -344,6 +375,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       setState(() {
         isInsertUpdate = false;
         editingYBID = null;
+        editYBlatlng = null;
         nameController.clear();
         longitudeController.clear();
         latitudeController.clear();
@@ -464,6 +496,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                   onPressed: () async {
                     isInsertUpdate = false;
                     editingYBID = null;
+                    editYBlatlng = null;
                     setState(() => isLoadingYoubikes = true);
                     await fetchYoubikes();
                   },
@@ -510,6 +543,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                                       onPressed: () {
                                         setState(() {
                                           editingYBID = item['YBID'];
+                                          editYBlatlng = LatLng(item['Latitude'], item['Longitude']);
                                           isInsertUpdate = true;
                                           selectedCity = item['CityID'];
                                           fetchTowns().then((_) {
