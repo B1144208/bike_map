@@ -460,6 +460,8 @@ class _HomePageState extends State<HomePage> {
                     setState(() {
                       showYoubike = index == 0;
                       currentPage = 0;
+                      selectedMarkerId = null; // 清除 YouBike 站點的選中狀態
+                      selectedCyclingRouteId = null; // 清除自行車道的選中狀態
                     });
                   },
                   constraints: const BoxConstraints(
@@ -745,7 +747,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // youbike 標記
+  // 畫面右側地圖區域-Youbike標記
   Widget _youbikeMarker() {
     return MarkerLayer(
       markers:
@@ -896,6 +898,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 畫面右側地圖區域-CyclingRoute起始點標記
   Widget _cyclingrouteMarkter() {
     return MarkerLayer(
       markers:
@@ -1091,7 +1094,7 @@ class _HomePageState extends State<HomePage> {
 
           //第9段
 
-          // 右側地圖區域
+          // 畫面右側地圖區域
           Expanded(
             child: FlutterMap(
               mapController: mapController,
@@ -1114,18 +1117,18 @@ class _HomePageState extends State<HomePage> {
 
                 //第10段
 
-                // YouBike 標記 - 只在選擇城市或有關鍵字後顯示
-                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
+                // YouBike標記 - 只在選擇城市或有關鍵字後顯示
+                if (showYoubike && (selectedCity != null || keywordController.text.trim().isNotEmpty)) // 修改這裡
                   _youbikeMarker(),
 
                 //第11段
 
-                // CyclingRoute 起始點標記 - 只在選擇城市或有關鍵字後顯示
-                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
+                // CyclingRoute起始點標記 - 只在選擇城市或有關鍵字後顯示
+                if (!showYoubike && (selectedCity != null || keywordController.text.trim().isNotEmpty)) // 修改這裡
                   _cyclingrouteMarkter(),
 
                 // CyclingRoute 路線 - 只在選擇城市或有關鍵字後顯示
-                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
+                if (!showYoubike && (selectedCity != null || keywordController.text.trim().isNotEmpty))
                   PolylineLayer(
                     polylines: cyclingroutes.map((routeData) {
                       final routeItem = routeData['data']; // 獲取原始路線資料
