@@ -1126,12 +1126,12 @@ class _HomePageState extends State<HomePage> {
                   userAgentPackageName: 'com.example.app',
                 ),
 
-                // YouBike標記 - 只在YouBike模式下且選擇城市或有關鍵字後顯示
-                if (showYoubike && (selectedCity != null || keywordController.text.trim().isNotEmpty))
+                // YouBike標記
+                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
                   _youbikeMarker(),
 
-                // CyclingRoute 路線 - 只在自行車道模式下且選擇城市或有關鍵字後顯示
-                if (!showYoubike && (selectedCity != null || keywordController.text.trim().isNotEmpty))
+                // CyclingRoute 路線
+                if (selectedCity != null || keywordController.text.trim().isNotEmpty)
                   PolylineLayer(
                     polylines: cyclingroutes.map((routeData) {
                       final routeItem = routeData['data']; // 獲取原始路線資料
