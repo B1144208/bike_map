@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -34,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> bookmark = [];
   int? selectedCity;
   int? selectedTown;
+  Set<int> highlightedYouBikeIds = {};
   bool isLoadingCities = true;
   bool isLoadingTowns = false;
   bool isLoadingYoubikes = false;
@@ -41,6 +43,8 @@ class _HomePageState extends State<HomePage> {
   bool showYoubike = true;
   int? selectedMarkerId; // YouBike 的選中標記 ID
   int? selectedCyclingRouteId; // CyclingRoute 的選中路線 ID
+
+
 
   // 分頁相關
   final int itemsPerPage = 20;
@@ -406,22 +410,45 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           isThreeLine: true,
-          onTap: () {
-            setState(() {
-              // 更新選中的自行車道 ID
-              selectedCyclingRouteId = item['CRID'];
+            onTap: () {
+              setState(() {
+                selectedCyclingRouteId = item['CRID'];
 
-              final coordinates = item['Coordinates'];
-              if (coordinates != null && coordinates.isNotEmpty) {
-                final startPoint = coordinates[0]; // [經度, 緯度]
-                final lat = double.tryParse(startPoint[1].toString());
-                final lng = double.tryParse(startPoint[0].toString());
-                if (lat != null && lng != null) {
-                  mapController.move(LatLng(lat, lng), 15.0);
+                final coordinates = item['Coordinates'];
+                if (coordinates != null && coordinates.isNotEmpty) {
+                  // 先把地圖移動到起點
+                  final startPoint = coordinates[0];
+                  final lat = double.tryParse(startPoint[1].toString());
+                  final lng = double.tryParse(startPoint[0].toString());
+                  if (lat != null && lng != null) {
+                    mapController.move(LatLng(lat, lng), 15.0);
+                  }
+
+                  // 清空原本的高亮清單
+                  highlightedYouBikeIds.clear();
+
+                  // 走訪整條自行車道的所有點，找出 1km 內的 YouBike 站點
+                  for (final point in coordinates) {
+                    final pointLat = double.tryParse(point[1].toString());
+                    final pointLng = double.tryParse(point[0].toString());
+                    if (pointLat == null || pointLng == null) continue;
+
+                    for (final youbikePoint in youbikes) {
+                      final ybLat = double.tryParse(youbikePoint['Latitude'].toString());
+                      final ybLng = double.tryParse(youbikePoint['Longitude'].toString());
+                      if (ybLat == null || ybLng == null) continue;
+
+                      final distance = _calculateDistance(pointLat, pointLng, ybLat, ybLng);
+                      if (distance <= 1000) { // 單位是 km
+                        highlightedYouBikeIds.add(int.parse(youbikePoint['YBID'].toString()));
+                      }
+                    }
+                  }
                 }
-              }
-            });
-          },
+              });
+            }
+
+
         ),
       );
     }
@@ -873,8 +900,10 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               Icons.location_pin,
               color: (selectedMarkerId != null && selectedMarkerId == int.parse(youbikePoint['YBID'].toString()))
-                  ? Colors.green  // 被選中的 Marker 顏色
-                  : Colors.red,  // 預設顏色
+                  ? Colors.green
+                  : (highlightedYouBikeIds.contains(int.parse(youbikePoint['YBID'].toString())))
+                  ? Colors.green  // 高亮顏色（可自訂）
+                  : Colors.red,  // 一般顏色
               size: 30,
             ),
 
@@ -988,6 +1017,23 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     fetchCities();
     _checkManager();
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000; // 地球半徑（公尺）
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) *
+            sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return (R * c).toDouble(); // 強制轉型為 double
+  }
+
+
+
+  double _deg2rad(double deg) {
+    return deg * (pi / 180);
   }
 
   // 計算點到線段的最短距離的輔助函數
@@ -1133,22 +1179,31 @@ class _HomePageState extends State<HomePage> {
                 // CyclingRoute 路線
                 if (selectedCity != null || keywordController.text.trim().isNotEmpty)
                   PolylineLayer(
-                    polylines: cyclingroutes.map((routeData) {
-                      final routeItem = routeData['data']; // 獲取原始路線資料
-                      final List<LatLng> latlngs = routeData['latlng']; // 獲取路線的座標點
+                    polylines: cyclingroutes
+                        .where((routeData) {
+                      // 如果有選取某條路線，只顯示那條；否則顯示所有
+                      if (selectedCyclingRouteId != null) {
+                        return routeData['data']['CRID'] == selectedCyclingRouteId;
+                      }
+                      return true; // 沒有選擇任何路線 → 顯示全部
+                    })
+                        .map((routeData) {
+                      final routeItem = routeData['data'];
+                      final List<LatLng> latlngs = routeData['latlng'];
 
-                      // 根據是否為選中的路線來決定線條顏色
-                      Color polylineColor = (routeItem['CRID'] != null && routeItem['CRID'] == selectedCyclingRouteId)
-                          ? Colors.green // 選中時顯示紫色
-                          : Colors.blue; // 預設顏色
+                      final isSelected = selectedCyclingRouteId != null &&
+                          routeItem['CRID'] == selectedCyclingRouteId;
 
                       return Polyline(
                         points: latlngs,
-                        color: polylineColor,
-                        strokeWidth: 4.0, // 線條粗細
+                        color: isSelected ? Colors.green : Colors.blue,
+                        strokeWidth: 4.0,
                       );
-                    }).toList(),
-                  ),
+                    })
+                        .toList(),
+                  )
+
+
               ],
             ),
           ),
