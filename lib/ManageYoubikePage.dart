@@ -26,7 +26,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   bool isLoadingCities = true;
   bool isLoadingTowns = false;
   bool isLoadingYoubikes = true;
-  bool isAdding = false;
+  bool isInsertUpdate = false;
   
   // keyword
   final TextEditingController keywordController = TextEditingController();
@@ -34,6 +34,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController longitudeController = TextEditingController();
   final TextEditingController latitudeController = TextEditingController();
+
+  // map
+  final mapController = MapController();
   
 
   int currentPage = 0;
@@ -110,7 +113,79 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       throw Exception('Failed to load towns');
     }
   }
+  Widget _youbikeMarker() {
+    //if (editingYBID == null) return null;
 
+    // 從 youbikes 清單中找出正在編輯的那一筆
+    final selected = youbikes.firstWhere(
+      (item) => item['YBID'] == editingYBID,
+      orElse: () => null,
+    );
+
+    //if (selected == null) return null;
+
+    final latitude = double.tryParse(selected['Latitude'].toString());
+    final longitude = double.tryParse(selected['Longitude'].toString());
+
+    //if (latitude == null || longitude == null) return null;
+
+    return MarkerLayer(
+      markers: [
+        Marker(
+          point: LatLng(latitude??0, longitude??0),
+          width: 60,
+          height: 60,
+          child: GestureDetector(
+            onTap: () {
+              // 你可以在這裡加點擊後的邏輯
+            },
+            child: const Icon(
+              Icons.location_pin,
+              color: Colors.red,
+              size: 30,
+            ),
+          ),
+        )
+      ],
+    );
+   
+  }
+  
+  // 新增/編輯 Youbike UI-地圖
+  Widget _youbikeMap(){
+    return SizedBox(
+      height: 300,
+      child: FlutterMap(
+        mapController: mapController,
+        options: MapOptions(
+          initialCameraFit: CameraFit.bounds(
+            bounds: LatLngBounds(
+              const LatLng(21.8, 119.8),
+              const LatLng(25.3, 122.0),
+            ),
+            padding: const EdgeInsets.all(0),
+          ),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate:
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: const ['a', 'b', 'c'],
+            userAgentPackageName: 'com.example.app',
+          ),
+
+          //第10段
+
+          // YouBike標記 - 只在選擇城市或有關鍵字後顯示
+          
+          _youbikeMarker(),
+
+        ],
+      ),
+    );
+  }
+
+  // 新增/編輯 Youbike UI-文字框
   Widget _youbikeForm() {
     return SingleChildScrollView(
       child: Column(
@@ -167,6 +242,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
+          _youbikeMap(),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -178,7 +255,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    isAdding = false;
+                    isInsertUpdate = false;
                     editingYBID = null;
                     nameController.clear();
                     longitudeController.clear();
@@ -224,7 +301,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         const SnackBar(content: Text('新增成功')),
       );
       setState(() {
-        isAdding = false;
+        isInsertUpdate = false;
         
         nameController.clear();
         longitudeController.clear();
@@ -265,7 +342,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         const SnackBar(content: Text('修改成功')),
       );
       setState(() {
-        isAdding = false;
+        isInsertUpdate = false;
         editingYBID = null;
         nameController.clear();
         longitudeController.clear();
@@ -278,8 +355,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       );
     }
   }
-
-
 
   // 刪除 youbikes
   Future<void> _deleteYoubike(int ybid) async {
@@ -297,6 +372,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       );
     }
   }
+  // 確認刪除懸浮框
   void _confirmDelete(int ybid) {
     showDialog(
       context: context,
@@ -386,7 +462,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                 const SizedBox(width: 30),
                 ElevatedButton(
                   onPressed: () async {
-                    isAdding = false;
+                    isInsertUpdate = false;
                     editingYBID = null;
                     setState(() => isLoadingYoubikes = true);
                     await fetchYoubikes();
@@ -399,7 +475,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                   label: const Text('新增'),
                   onPressed: () {
                     setState(() {
-                      isAdding = true;
+                      isInsertUpdate = true;
                     });
                   },
                 ),
@@ -409,7 +485,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
             Expanded(
               child: isLoadingYoubikes
               ? const Center(child: CircularProgressIndicator())
-              : isAdding
+              : isInsertUpdate
+                // 新增
                 ? _youbikeForm()
                 : youbikes.isEmpty
                     ? const Center(child: Text('無 YouBike 站點資料'))
@@ -431,10 +508,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                                     IconButton(
                                       icon: const Icon(Icons.edit, color: Colors.blue),
                                       onPressed: () {
-                                        // **********************************************************************************************************************
                                         setState(() {
                                           editingYBID = item['YBID'];
-                                          isAdding = true;
+                                          isInsertUpdate = true;
                                           selectedCity = item['CityID'];
                                           fetchTowns().then((_) {
                                             setState(() {
