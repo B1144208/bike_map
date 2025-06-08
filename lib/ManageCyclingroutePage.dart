@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'config.dart';
 
@@ -11,13 +14,10 @@ class ManageCyclingroutePage extends StatefulWidget {
   State<ManageCyclingroutePage> createState() => _ManageCyclingroutePageState();
 }
 
-
-
 class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   List<dynamic> cities = [];
   List<dynamic> towns = [];
   List<dynamic> cyclingroutes = [];
-  // ******************************************************************************************************
   List<List<double>> coordinates = [];
 
   int? selectedCity;
@@ -26,18 +26,22 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
 
   bool isLoading = true;
   bool isAdding = false;
+  bool isSimpleMode = true; // 新增：簡易/詳細模式切換
 
   final int itemsPerPage = 50;
   int currentPage = 0;
 
   final ScrollController _scrollController = ScrollController();
 
+  // 地圖相關
+  final mapController = MapController();
+
   List<dynamic> get currentPageItems {
     final start = currentPage * itemsPerPage;
     final end = (start + itemsPerPage).clamp(0, cyclingroutes.length);
     return cyclingroutes.sublist(start, end);
   }
-  
+
   // keyword
   final TextEditingController keywordController = TextEditingController();
 
@@ -47,16 +51,15 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   final TextEditingController startController = TextEditingController();
   final TextEditingController endController = TextEditingController();
   final TextEditingController lengthController = TextEditingController();
-  final TextEditingController directionController = TextEditingController();
   final TextEditingController finishDateController = TextEditingController();
   final TextEditingController managementIdController = TextEditingController();
 
-  // 點座標 ***********************************************************************************
+  // 方向選擇
+  String? selectedDirection;
+
+  // 點座標 (詳細模式使用)
   final TextEditingController coordinateLngController = TextEditingController();
   final TextEditingController coordinateLatController = TextEditingController();
-  
-
-  
 
   @override
   void initState() {
@@ -110,9 +113,9 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
 
     if (checkRes.statusCode == 200) {
       final result = jsonDecode(checkRes.body);
-      return result[0]['ManagementID']; // 成功找到，直接回傳
+      return result[0]['ManagementID'];
     }
-    // 如果找不到，建立新的
+
     final createRes = await http.post(
       Uri.parse('$baseUrl/management/insertManagement'),
       headers: {'Content-Type': 'application/json'},
@@ -122,7 +125,53 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final created = jsonDecode(createRes.body);
       return created['ManagementID'];
     }
-    return null; // 建立失敗或發生錯誤
+    return null;
+  }
+
+  // 計算兩點間距離（公尺）
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000; // 地球半徑（公尺）
+    final dLat = _deg2rad(lat2 - lat1);
+    final dLon = _deg2rad(lon2 - lon1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_deg2rad(lat1)) * cos(_deg2rad(lat2)) *
+            sin(dLon / 2) * sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
+  double _deg2rad(double deg) {
+    return deg * (pi / 180);
+  }
+
+  // 計算總路線長度
+  double _calculateTotalLength() {
+    if (coordinates.length < 2) return 0;
+
+    double totalLength = 0;
+    for (int i = 0; i < coordinates.length - 1; i++) {
+      totalLength += _calculateDistance(
+        coordinates[i][1], // lat
+        coordinates[i][0], // lng
+        coordinates[i + 1][1], // lat
+        coordinates[i + 1][0], // lng
+      );
+    }
+    return totalLength;
+  }
+
+  // 更新起點、終點和長度
+  void _updateRouteInfo() {
+    if (coordinates.isNotEmpty) {
+      // 更新起點（第一個點的反向地址解析，這裡簡化為座標）
+      startController.text = '${coordinates.first[1].toStringAsFixed(6)}, ${coordinates.first[0].toStringAsFixed(6)}';
+
+      // 更新終點（最後一個點的反向地址解析，這裡簡化為座標）
+      endController.text = '${coordinates.last[1].toStringAsFixed(6)}, ${coordinates.last[0].toStringAsFixed(6)}';
+
+      // 更新長度
+      lengthController.text = _calculateTotalLength().round().toString();
+    }
   }
 
   void _addCoordinate() {
@@ -133,20 +182,140 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         coordinates.add([lng, lat]);
         coordinateLngController.clear();
         coordinateLatController.clear();
+        _updateRouteInfo(); // 更新路線資訊
       });
     }
+  }
+
+  // 地圖點擊添加座標（簡易模式）
+  void _addCoordinateFromMap(LatLng point) {
+    setState(() {
+      coordinates.add([point.longitude, point.latitude]);
+      _updateRouteInfo(); // 更新路線資訊
+    });
   }
 
   void _removeCoordinate(int index) {
     setState(() {
       coordinates.removeAt(index);
+      _updateRouteInfo(); // 更新路線資訊
     });
   }
 
   void _clearCoordinates() {
     setState(() {
-      coordinates = coordinates;
+      coordinates.clear();
+      startController.clear();
+      endController.clear();
+      lengthController.clear();
     });
+  }
+
+  // 日期選擇器
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        finishDateController.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
+  }
+
+  // 自行車道標記
+  Widget _cyclingrouteMarkers() {
+    return MarkerLayer(
+      markers: coordinates.asMap().entries.map((entry) {
+        int index = entry.key;
+        List<double> coord = entry.value;
+
+        return Marker(
+          point: LatLng(coord[1], coord[0]),
+          width: 60,
+          height: 60,
+          child: GestureDetector(
+            onTap: () {
+              // 可以在這裡加點擊標記的邏輯，例如刪除該點
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('座標點 ${index + 1}'),
+                  content: Text('經度: ${coord[0]}\n緯度: ${coord[1]}'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _removeCoordinate(index);
+                      },
+                      child: const Text('刪除', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: Icon(
+              Icons.location_on,
+              color: index == 0 ? Colors.green : (index == coordinates.length - 1 ? Colors.red : Colors.blue),
+              size: 30,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // 自行車道路線
+  Widget _cyclingroutePolylines() {
+    if (coordinates.length < 2) return Container();
+
+    return PolylineLayer(
+      polylines: [
+        Polyline(
+          points: coordinates.map((coord) => LatLng(coord[1], coord[0])).toList(),
+          color: Colors.blue,
+          strokeWidth: 4.0,
+        ),
+      ],
+    );
+  }
+
+  // 地圖Widget
+  Widget _cyclingrouteMap() {
+    return SizedBox(
+      height: 300,
+      child: FlutterMap(
+        mapController: mapController,
+        options: MapOptions(
+          onTap: isSimpleMode ? (tapPosition, point) {
+            _addCoordinateFromMap(point);
+          } : null,
+          initialCameraFit: CameraFit.bounds(
+            bounds: LatLngBounds(
+              const LatLng(21.8, 119.8),
+              const LatLng(25.3, 122.0),
+            ),
+            padding: const EdgeInsets.all(0),
+          ),
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: const ['a', 'b', 'c'],
+            userAgentPackageName: 'com.example.app',
+          ),
+          _cyclingroutePolylines(),
+          _cyclingrouteMarkers(),
+        ],
+      ),
+    );
   }
 
   Future<bool> _coordinatesEqual(int crid) async {
@@ -203,7 +372,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final parsed = coordList.map<List<double>>((c) => [c[0] as double, c[1] as double]).toList();
       setState(() {
         coordinates = parsed;
-        coordinates = coordinates;
+        _updateRouteInfo(); // 載入座標後更新路線資訊
       });
     }
   }
@@ -231,9 +400,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Start': startController.text,
       'End': endController.text,
       'Length': double.tryParse(lengthController.text),
-      'Direction': directionController.text,
+      'Direction': selectedDirection ?? '',
       'FinishDate': finishDateController.text,
       'ManagementID': managementID,
+      'Coordinates': coordinates,  // 新增：傳送座標資料
     };
 
     final response = await http.post(
@@ -246,7 +416,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final res = jsonDecode(response.body);
       final insertedId = res['insertedId'];
 
-      
+      // 由於我們已經在主要 insert 中處理了 Geometry，
+      // 這裡仍保留點資料插入以維持與 cyclingroute_point 表的相容性
       for (final coord in coordinates) {
         final lng = double.tryParse(coord[0].toString());
         final lat = double.tryParse(coord[1].toString());
@@ -278,7 +449,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
 
   // 編輯 cyclingroutes
   Future<void> _submitUpdate() async {
-    // ***************************************************************************************************
     print("_submitUpdate(): $editingCRID");
     if (editingCRID == null) return;
 
@@ -294,7 +464,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         return;
       }
     }
-    
+
     final body = {
       'CityID': selectedCity,
       'TownID': selectedTown,
@@ -303,9 +473,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Start': startController.text,
       'End': endController.text,
       'Length': double.tryParse(lengthController.text),
-      'Direction': directionController.text,
+      'Direction': selectedDirection ?? '',
       'FinishDate': finishDateController.text,
       'ManagementID': managementID,
+      'Coordinates': coordinates,  // 新增：傳送座標資料
     };
 
     final response = await http.put(
@@ -313,7 +484,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
-    await _syncCoordinatesWithServer(editingCRID??0);
+
+    // 同步座標資料到 cyclingroute_point 表
+    await _syncCoordinatesWithServer(editingCRID ?? 0);
+
     if (response.statusCode == 200) {
       await fetchCyclingroutes();
       setState(() => editingCRID = null);
@@ -324,12 +498,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         curve: Curves.easeOut,
       );
     }
-
-    final item = cyclingroutes.firstWhere(
-      (e) => e['CRID'] == editingCRID,
-      orElse: () => {},
-    );
-    //await _syncCoordinatesWithServer();
   }
 
   // 刪除 cyclingroutes
@@ -346,24 +514,25 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     setState(() {
       isAdding = false;
       editingCRID = null;
+      selectedDirection = null;
       nameController.clear();
       alternateNamesController.clear();
       startController.clear();
       endController.clear();
       lengthController.clear();
-      directionController.clear();
       finishDateController.clear();
       managementIdController.clear();
+      _clearCoordinates();
     });
   }
 
-  void _confirmDelete(int ybid) {
+  void _confirmDelete(int crid) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('確認刪除'),
-          content: Text('確定要刪除站點 $ybid 嗎？'),
+          content: Text('確定要刪除路線 $crid 嗎？'),
           actions: [
             TextButton(
               child: const Text('取消'),
@@ -372,8 +541,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             TextButton(
               child: const Text('刪除'),
               onPressed: () async {
-                Navigator.of(context).pop(); // 關閉 dialog
-                await _deleteCyclingroute(ybid);
+                Navigator.of(context).pop();
+                await _deleteCyclingroute(crid);
               },
             ),
           ],
@@ -382,16 +551,45 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false}) {
+  // 方向選擇Widget
+  Widget _buildDirectionDropdown() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
+      child: SizedBox(
+        width: MediaQuery.of(context).size.width / 3,
+        child: DropdownButtonFormField<String>(
+          value: selectedDirection,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            labelText: '方向',
+          ),
+          items: const [
+            DropdownMenuItem(value: '單向', child: Text('單向')),
+            DropdownMenuItem(value: '雙向', child: Text('雙向')),
+          ],
+          onChanged: (String? value) {
+            setState(() {
+              selectedDirection = value;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false, bool readOnly = false, VoidCallback? onTap}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
       child: SizedBox(
         width: MediaQuery.of(context).size.width / 3,
         child: TextField(
           controller: controller,
+          readOnly: readOnly,
+          onTap: onTap,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             labelText: label,
+            suffixIcon: label.contains('日期') ? const Icon(Icons.calendar_today) : null,
           ),
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         ),
@@ -399,8 +597,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-
-  Widget _cyclingrouteForm() {
+  // 簡易模式表單
+  Widget _simpleForm() {
     return Column(
       children: [
         const Divider(height: 32, thickness: 1),
@@ -438,14 +636,96 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             ),
           ],
         ),
-        _buildTextField('Name', nameController),
-        _buildTextField('Alternate Name', alternateNamesController),
-        _buildTextField('Start', startController),
-        _buildTextField('End', endController),
-        _buildTextField('Length', lengthController, isNumber: true),
-        _buildTextField('Direction', directionController),
-        _buildTextField('FinishDate', finishDateController),
-        _buildTextField('Management', managementIdController),
+        _buildTextField('路線名稱', nameController),
+        _buildTextField('路線別名', alternateNamesController),
+        _buildDirectionDropdown(),
+        _buildTextField('完成日期', finishDateController, readOnly: true, onTap: _selectDate),
+        _buildTextField('管理單位', managementIdController),
+
+        const SizedBox(height: 16),
+        const Text('點擊地圖添加路線座標點', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text('綠色標記為起點，紅色標記為終點', style: TextStyle(fontSize: 12, color: Colors.grey)),
+
+        _cyclingrouteMap(),
+
+        const SizedBox(height: 16),
+
+        if (coordinates.isNotEmpty) ...[
+          Text('已添加 ${coordinates.length} 個座標點'),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: _clearCoordinates,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('清除所有座標'),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: editingCRID == null ? _submitInsert : _submitUpdate,
+              child: Text(editingCRID == null ? '確認新增' : '確認修改'),
+            ),
+            const SizedBox(width: 20),
+            ElevatedButton(
+              onPressed: _clearForm,
+              child: const Text('取消'),
+            ),
+          ],
+        )
+      ],
+    );
+  }
+
+  // 詳細模式表單（原來的表單）
+  Widget _detailedForm() {
+    return Column(
+      children: [
+        const Divider(height: 32, thickness: 1),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            DropdownButton<int>(
+              value: selectedCity,
+              hint: const Text('選擇城市'),
+              onChanged: (value) {
+                setState(() {
+                  selectedCity = value;
+                  selectedTown = null;
+                  fetchTowns();
+                });
+              },
+              items: cities.map<DropdownMenuItem<int>>((city) {
+                return DropdownMenuItem<int>(
+                  value: city['CityID'],
+                  child: Text(city['CityName']),
+                );
+              }).toList(),
+            ),
+            const SizedBox(width: 20),
+            DropdownButton<int>(
+              value: selectedTown,
+              hint: const Text('選擇鄉鎮'),
+              onChanged: (value) => setState(() => selectedTown = value),
+              items: towns.map<DropdownMenuItem<int>>((town) {
+                return DropdownMenuItem<int>(
+                  value: town['TownID'],
+                  child: Text(town['TownName']),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+        _buildTextField('路線名稱', nameController),
+        _buildTextField('路線別名', alternateNamesController),
+        _buildTextField('起點', startController),
+        _buildTextField('終點', endController),
+        _buildTextField('長度(公尺)', lengthController, isNumber: true),
+        _buildDirectionDropdown(),
+        _buildTextField('完成日期', finishDateController, readOnly: true, onTap: _selectDate),
+        _buildTextField('管理單位', managementIdController),
 
         const SizedBox(height: 16),
 
@@ -473,13 +753,14 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             )
           ],
         ),
+
         ListView.builder(
           shrinkWrap: true,
           itemCount: coordinates.length,
           itemBuilder: (context, index) {
             final coord = coordinates[index];
             return ListTile(
-              title: Text('(${coord[0]}, ${coord[1]})'),
+              title: Text('${index + 1}. (${coord[0]}, ${coord[1]})'),
               trailing: IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () => _removeCoordinate(index),
@@ -487,7 +768,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             );
           },
         ),
-        
+
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -506,6 +787,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
+  Widget _cyclingrouteForm() {
+    return isSimpleMode ? _simpleForm() : _detailedForm();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -516,164 +801,193 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      
-                      const SizedBox(width: 20),
-                      DropdownButton<int>(
-                        value: selectedCity,
-                        hint: const Text('選擇城市'),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedCity = value;
-                            selectedTown = null;
-                            fetchTowns();
-                          });
-                        },
-                        items: cities.map<DropdownMenuItem<int>>((city) {
-                          return DropdownMenuItem<int>(
-                            value: city['CityID'],
-                            child: Text(city['CityName']),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(width: 20),
-                      DropdownButton<int>(
-                        value: selectedTown,
-                        hint: const Text('選擇鄉鎮'),
-                        onChanged: (value) => setState(() => selectedTown = value),
-                        items: towns.map<DropdownMenuItem<int>>((town) {
-                          return DropdownMenuItem<int>(
-                            value: town['TownID'],
-                            child: Text(town['TownName']),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(width: 20),
-                      SizedBox(
-                        width: 150,
-                        child: TextField(
-                          controller: keywordController,
-                          decoration: const InputDecoration(hintText: '輸入關鍵字'),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      ElevatedButton(
-                        onPressed: fetchCyclingroutes,
-                        child: const Text('搜尋'),
-                      ),
-                      const SizedBox(width: 50),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('新增'),
-                        onPressed: () {
-                          setState(() {
-                            isAdding = true;
-                            editingCRID = null;
-                            nameController.clear();
-                            alternateNamesController.clear();
-                            startController.clear();
-                            endController.clear();
-                            lengthController.clear();
-                            directionController.clear();
-                            finishDateController.clear();
-                            managementIdController.clear();
-                          });
-                        },
-                      ),
-                    ],
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                DropdownButton<int>(
+                  value: selectedCity,
+                  hint: const Text('選擇城市'),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedCity = value;
+                      selectedTown = null;
+                      fetchTowns();
+                    });
+                  },
+                  items: cities.map<DropdownMenuItem<int>>((city) {
+                    return DropdownMenuItem<int>(
+                      value: city['CityID'],
+                      child: Text(city['CityName']),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(width: 20),
+                DropdownButton<int>(
+                  value: selectedTown,
+                  hint: const Text('選擇鄉鎮'),
+                  onChanged: (value) => setState(() => selectedTown = value),
+                  items: towns.map<DropdownMenuItem<int>>((town) {
+                    return DropdownMenuItem<int>(
+                      value: town['TownID'],
+                      child: Text(town['TownName']),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(width: 20),
+                SizedBox(
+                  width: 150,
+                  child: TextField(
+                    controller: keywordController,
+                    decoration: const InputDecoration(hintText: '輸入關鍵字'),
                   ),
-                  const SizedBox(height: 12),
-                  isAdding
-                      ? _cyclingrouteForm()
-                      : cyclingroutes.isEmpty
-                        ? const Padding(
-                            padding: EdgeInsets.only(top: 30.0),
-                            child: Text('無自行車道資料'),
-                          )
-                        : Column(
-                          children: [
-                            ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: currentPageItems.length,
-                              itemBuilder: (context, index) {
-                                final item = currentPageItems[index];
-                                return ListTile(
-                                  title: Text('[${item['CRID']}] ${item['Name']}'),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () {
-                                          setState(() {
-                                            editingCRID = item['CRID'];
-                                            isAdding = true;
-                                            selectedCity = item['CityID'];
-                                            fetchTowns().then((_) {
-                                              setState(() {
-                                                selectedTown = item['TownID'];
-                                              });
-                                            });
-                                            nameController.text = item['Name'] ?? '';
-                                            alternateNamesController.text = item['AlternateNames'] ?? '';
-                                            startController.text = item['Start'] ?? '';
-                                            endController.text = item['End'] ?? '';
-                                            lengthController.text = item['Length']?.toString() ?? '';
-                                            directionController.text = item['Direction'] ?? '';
-                                            finishDateController.text = item['FinishDate'] ?? '';
-                                            managementIdController.text = item['ManagementName'] ?? '';
-                                            _loadCoordinatesFromItem(item);
-                                          });
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () {
-                                          _confirmDelete(item['CRID']);
-                                        },
-                                      )
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: currentPage > 0
-                                      ? () {
-                                          setState(() {
-                                            currentPage--;
-                                          });
-                                        }
-                                      : null,
-                                  child: const Text('上一頁'),
-                                ),
-                                const SizedBox(width: 20),
-                                Text('第 ${currentPage + 1} 頁 / 共 ${((cyclingroutes.length - 1) / itemsPerPage).floor() + 1} 頁'),
-                                const SizedBox(width: 20),
-                                ElevatedButton(
-                                  onPressed: (currentPage + 1) * itemsPerPage < cyclingroutes.length
-                                      ? () {
-                                          setState(() {
-                                            currentPage++;
-                                          });
-                                        }
-                                      : null,
-                                  child: const Text('下一頁'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                ),
+                const SizedBox(width: 20),
+                ElevatedButton(
+                  onPressed: fetchCyclingroutes,
+                  child: const Text('搜尋'),
+                ),
+                const SizedBox(width: 20),
+                // 新增簡易/詳細模式切換按鈕
+                if (isAdding) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: ToggleButtons(
+                      borderRadius: BorderRadius.circular(20),
+                      isSelected: [isSimpleMode, !isSimpleMode],
+                      onPressed: (index) {
+                        setState(() {
+                          isSimpleMode = index == 0;
+                        });
+                      },
+                      constraints: const BoxConstraints(
+                        minWidth: 60,
+                        minHeight: 35,
+                      ),
+                      selectedColor: Colors.white,
+                      fillColor: Colors.blue,
+                      color: Colors.black,
+                      children: const [
+                        Text('簡易'),
+                        Text('詳細'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 20),
                 ],
-              ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.add),
+                  label: const Text('新增'),
+                  onPressed: () {
+                    setState(() {
+                      isAdding = true;
+                      editingCRID = null;
+                      selectedDirection = null;
+                      nameController.clear();
+                      alternateNamesController.clear();
+                      startController.clear();
+                      endController.clear();
+                      lengthController.clear();
+                      finishDateController.clear();
+                      managementIdController.clear();
+                      _clearCoordinates();
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            isAdding
+                ? _cyclingrouteForm()
+                : cyclingroutes.isEmpty
+                ? const Padding(
+              padding: EdgeInsets.only(top: 30.0),
+              child: Text('無自行車道資料'),
+            )
+                : Column(
+              children: [
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: currentPageItems.length,
+                  itemBuilder: (context, index) {
+                    final item = currentPageItems[index];
+                    return ListTile(
+                      title: Text('[${item['CRID']}] ${item['Name']}'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.blue),
+                            onPressed: () {
+                              setState(() {
+                                editingCRID = item['CRID'];
+                                isAdding = true;
+                                selectedCity = item['CityID'];
+                                fetchTowns().then((_) {
+                                  setState(() {
+                                    selectedTown = item['TownID'];
+                                  });
+                                });
+                                nameController.text = item['Name'] ?? '';
+                                alternateNamesController.text = item['AlternateNames'] ?? '';
+                                startController.text = item['Start'] ?? '';
+                                endController.text = item['End'] ?? '';
+                                lengthController.text = item['Length']?.toString() ?? '';
+                                selectedDirection = item['Direction'] ?? '';
+                                finishDateController.text = item['FinishDate'] ?? '';
+                                managementIdController.text = item['ManagementName'] ?? '';
+                                _loadCoordinatesFromItem(item);
+                              });
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              _confirmDelete(item['CRID']);
+                            },
+                          )
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton(
+                      onPressed: currentPage > 0
+                          ? () {
+                        setState(() {
+                          currentPage--;
+                        });
+                      }
+                          : null,
+                      child: const Text('上一頁'),
+                    ),
+                    const SizedBox(width: 20),
+                    Text('第 ${currentPage + 1} 頁 / 共 ${((cyclingroutes.length - 1) / itemsPerPage).floor() + 1} 頁'),
+                    const SizedBox(width: 20),
+                    ElevatedButton(
+                      onPressed: (currentPage + 1) * itemsPerPage < cyclingroutes.length
+                          ? () {
+                        setState(() {
+                          currentPage++;
+                        });
+                      }
+                          : null,
+                      child: const Text('下一頁'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

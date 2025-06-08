@@ -63,7 +63,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ✅ Insert cyclingroute
+// ✅ Insert cyclingroute (修正SQL語句，加入Geometry)
 router.post('/insertCyclingroute', (req, res, next) => {
   const {
     CityID,
@@ -75,16 +75,27 @@ router.post('/insertCyclingroute', (req, res, next) => {
     End,
     Length,
     Direction,
-    FinishDate
+    FinishDate,
+    Coordinates  // 新增：從前端接收座標陣列
   } = req.body;
 
   if (!CityID || !Name ) {
     return res.status(400).json({ message: '缺少必要欄位' });
   }
 
+  // 將座標陣列轉換為 Geometry JSON 格式
+  let geometry = null;
+  if (Coordinates && Coordinates.length > 0) {
+    geometry = JSON.stringify({
+      type: "MultiLineString",
+      coordinates: [Coordinates]  // Coordinates 是 [[lng, lat], [lng, lat], ...] 格式
+    });
+  }
+
+  // 修正：加入 Geometry 欄位
   const sql = `
-    INSERT INTO cyclingroute 
-    (CityID, TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID)
+    INSERT INTO cyclingroute
+    (CityID, TownID, Name, AlternateNames, Geometry, Start, End, Length, Direction, FinishDate, ManagementID)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
@@ -93,6 +104,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
     TownID || null,
     Name,
     AlternateNames || null,
+    geometry,  // 新增：Geometry 資料
     Start || null,
     End || null,
     Length || null,
@@ -108,7 +120,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
 });
 
 
-// ✅ Update cyclingroute
+// ✅ Update cyclingroute (加入Geometry更新)
 router.put('/updateCyclingroute/:crid', (req, res, next) => {
   const crid = req.params.crid;
   const {
@@ -117,17 +129,26 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
     ManagementID,
     Name,
     AlternateNames,
-    
     Start,
     End,
     Length,
     Direction,
-    FinishDate
+    FinishDate,
+    Coordinates  // 新增：從前端接收座標陣列
   } = req.body;
 
+  // 將座標陣列轉換為 Geometry JSON 格式
+  let geometry = null;
+  if (Coordinates && Coordinates.length > 0) {
+    geometry = JSON.stringify({
+      type: "MultiLineString",
+      coordinates: [Coordinates]  // Coordinates 是 [[lng, lat], [lng, lat], ...] 格式
+    });
+  }
+
   const sql = `
-    UPDATE cyclingroute 
-    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?, 
+    UPDATE cyclingroute
+    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?, Geometry = ?,
     Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?
     WHERE CRID = ?
   `;
@@ -137,6 +158,7 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
         TownID || null,
         Name,
         AlternateNames || null,
+        geometry,  // 新增：Geometry 資料
         Start || null,
         End || null,
         Length || null,
