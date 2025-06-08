@@ -216,6 +216,9 @@ class _HomePageState extends State<HomePage> {
   // 修改：只在選擇城市後才載入資料
   Future<void> loadAllData() async {
     if (selectedCity != null || keywordController.text.trim().isNotEmpty) {
+      setState(() {
+        highlightedYouBikeIds.clear(); // 在載入新資料前清除高亮狀態
+      });
       await fetchYoubikes();
       await fetchCyclingRoutes();
     }
@@ -373,43 +376,43 @@ class _HomePageState extends State<HomePage> {
         elevation: 2,
         margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
         child: ListTile(
-          leading: FutureBuilder<bool>(
-            future: IsLogin(),
-            builder: (context, snapshot) {
-              final isLoggedIn = snapshot.data ?? false;
-              if (!isLoggedIn) {
-                return const Icon(Icons.route, color: Colors.blue);
-              }
+            leading: FutureBuilder<bool>(
+              future: IsLogin(),
+              builder: (context, snapshot) {
+                final isLoggedIn = snapshot.data ?? false;
+                if (!isLoggedIn) {
+                  return const Icon(Icons.route, color: Colors.blue);
+                }
 
-              return FutureBuilder<int>(
-                future: IsBookmarkExist(item['CRID'], false),
-                builder: (context, bookmarkSnapshot) {
-                  final isBookmarked = (bookmarkSnapshot.data ?? 0) != 0;
-                  return GestureDetector(
-                    onTap: () async {
-                      if (isLoggedIn) {
-                        await toggleFavorite(item['CRID'], false);
-                      }
-                    },
-                    child: Icon(
-                      isBookmarked ? Icons.favorite : Icons.favorite_border,
-                      color: Colors.red,
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-          title: Text(item['Name'] ?? '未命名'),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${item['CityName'] ?? ''} ${item['TownName'] ?? ''}'),
-              if (item['Start'] != null) Text('起點: ${item['Start']}'),
-              if (item['End'] != null) Text('終點: ${item['End']}'),
-            ],
-          ),
-          isThreeLine: true,
+                return FutureBuilder<int>(
+                  future: IsBookmarkExist(item['CRID'], false),
+                  builder: (context, bookmarkSnapshot) {
+                    final isBookmarked = (bookmarkSnapshot.data ?? 0) != 0;
+                    return GestureDetector(
+                      onTap: () async {
+                        if (isLoggedIn) {
+                          await toggleFavorite(item['CRID'], false);
+                        }
+                      },
+                      child: Icon(
+                        isBookmarked ? Icons.favorite : Icons.favorite_border,
+                        color: Colors.red,
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            title: Text(item['Name'] ?? '未命名'),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${item['CityName'] ?? ''} ${item['TownName'] ?? ''}'),
+                if (item['Start'] != null) Text('起點: ${item['Start']}'),
+                if (item['End'] != null) Text('終點: ${item['End']}'),
+              ],
+            ),
+            isThreeLine: true,
             onTap: () {
               setState(() {
                 selectedCyclingRouteId = item['CRID'];
@@ -618,15 +621,13 @@ class _HomePageState extends State<HomePage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed:
-              (selectedCity == null &&
-                  keywordController.text
-                      .trim()
-                      .isEmpty) ||
-                  isLoadingYoubikes
+              onPressed: (selectedCity == null && keywordController.text.trim().isEmpty) || isLoadingYoubikes
                   ? null
                   : () async {
-                setState(() => currentPage = 0);
+                setState(() {
+                  currentPage = 0;
+                  selectedCyclingRouteId = null; // ✅ 清除已選的路線
+                });
                 await loadAllData();
               },
               child:
@@ -765,6 +766,8 @@ class _HomePageState extends State<HomePage> {
     return MarkerLayer(
       markers:
       youbikes.map<Marker>((youbikePoint) {
+        final int currentYoubikeId = int.parse(youbikePoint['YBID'].toString()); // 獲取當前 YouBike 站點的 ID
+
         return Marker(
           point: LatLng(
             double.parse(youbikePoint['Latitude'].toString()),
@@ -776,6 +779,14 @@ class _HomePageState extends State<HomePage> {
           height: 60,
           child: GestureDetector(
             onTap: () async {
+              // **關鍵修改點 1：更新 selectedMarkerId 並清除 highlightedYouBikeIds**
+              // 點擊地圖上的 YouBike 站點時，將其設定為選中，並清除自行車道相關的高亮
+              setState(() {
+                selectedMarkerId = currentYoubikeId;
+                highlightedYouBikeIds.clear(); // 清除所有因自行車道而高亮的站點
+              });
+
+              // 原始的收藏邏輯和對話框顯示保持不變
               bool isLog = await IsLogin();
               bool locallsFavorited = false;
 
@@ -784,8 +795,7 @@ class _HomePageState extends State<HomePage> {
                   int.parse(youbikePoint['YBID'].toString()),
                   true,
                 );
-                locallsFavorited =
-                (BMYBID == 0) ? false : true;
+                locallsFavorited = (BMYBID == 0) ? false : true;
               } else {
                 locallsFavorited = false;
               }
@@ -803,64 +813,41 @@ class _HomePageState extends State<HomePage> {
                         ),
                         actions: [
                           Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: [
                               GestureDetector(
                                 onTap: () async {
-                                  bool isLogInner =
-                                  await IsLogin();
+                                  bool isLogInner = await IsLogin();
                                   if (isLogInner) {
                                     await toggleFavorite(
                                       youbikePoint['YBID'],
                                       true,
                                     );
                                     setStateDialog(() {
-                                      locallsFavorited =
-                                      !locallsFavorited;
+                                      locallsFavorited = !locallsFavorited;
                                     });
                                   } else {
                                     showDialog(
                                       context: context,
-                                      builder: (
-                                          BuildContext context,
-                                          ) {
+                                      builder: (BuildContext context) {
                                         return AlertDialog(
-                                          title: const Text(
-                                            '通知',
-                                          ),
-                                          content: const Text(
-                                            '請先登入帳號再繼續',
-                                          ),
+                                          title: const Text('通知'),
+                                          content: const Text('請先登入帳號再繼續'),
                                           actions: <Widget>[
                                             TextButton(
-                                              child:
-                                              const Text(
-                                                '取消',
-                                              ),
+                                              child: const Text('取消'),
                                               onPressed: () {
-                                                Navigator.of(
-                                                  context,
-                                                ).pop();
+                                                Navigator.of(context).pop();
                                               },
                                             ),
                                             TextButton(
-                                              child:
-                                              const Text(
-                                                '確定',
-                                              ),
+                                              child: const Text('確定'),
                                               onPressed: () {
-                                                Navigator.of(
-                                                  context,
-                                                ).pop();
+                                                Navigator.of(context).pop();
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder:
-                                                        (
-                                                        context,
-                                                        ) =>
-                                                        LoginPage(),
+                                                    builder: (context) => LoginPage(),
                                                   ),
                                                 );
                                               },
@@ -881,11 +868,14 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const Spacer(),
                               TextButton(
-                                onPressed:
-                                    () =>
-                                    Navigator.of(
-                                      context,
-                                    ).pop(),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  // **關鍵修改點 2：在關閉對話框時清除 selectedMarkerId**
+                                  // 這樣點擊的站點會恢復到其高亮或默認顏色
+                                  setState(() {
+                                    selectedMarkerId = null;
+                                  });
+                                },
                                 child: const Text('關閉'),
                               ),
                             ],
@@ -902,11 +892,10 @@ class _HomePageState extends State<HomePage> {
               color: (selectedMarkerId != null && selectedMarkerId == int.parse(youbikePoint['YBID'].toString()))
                   ? Colors.green
                   : (highlightedYouBikeIds.contains(int.parse(youbikePoint['YBID'].toString())))
-                  ? Colors.green  // 高亮顏色（可自訂）
-                  : Colors.red,  // 一般顏色
+                  ? Colors.yellow // 高亮顏色（可自訂）
+                  : Colors.red, // 一般顏色
               size: 30,
             ),
-
           ),
         );
       }).toList(),
@@ -928,6 +917,20 @@ class _HomePageState extends State<HomePage> {
       locallsFavorited = false;
     }
 
+    // 提取與此自行車道相關的 YouBike 站點 ID
+    // 假設 data['RelatedYouBikeStations'] 是一個包含 YouBike ID 的列表
+    final List<int> relatedYouBikeSIDs = (data['RelatedYouBikeStations'] as List<dynamic>?)
+        ?.map((e) => int.parse(e.toString()))
+        .toList() ??
+        []; // 確保處理可能為 null 的情況
+
+    // 在顯示對話框之前，更新高亮狀態
+    // 這會觸發地圖重新繪製，使相關的 YouBike 站點變色
+    setState(() {
+      highlightedYouBikeIds.clear(); // 清除之前的高亮
+      highlightedYouBikeIds.addAll(relatedYouBikeSIDs); // 添加新的高亮站點
+    });
+
     showDialog(
       context: context,
       builder: (context) {
@@ -941,7 +944,8 @@ class _HomePageState extends State<HomePage> {
                     '終　　點: ${data['End'] ?? '無資料'}\n'
                     '長　　度: ${data['Length'] ?? '無資料'} 公尺\n'
                     '完成日期: ${data['FinishDate'] ?? '無資料'}\n'
-                    '管理單位: ${data['ManagementName'] ?? '無資料'}\n',
+                    '管理單位: ${data['ManagementName'] ?? '無資料'}\n'
+                    '相關YouBike站點數量: ${relatedYouBikeSIDs.length}\n', // 添加顯示相關站點數量
               ),
               actions: [
                 Row(
@@ -998,7 +1002,14 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const Spacer(),
                     TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        // 在對話框關閉時清除高亮狀態和選中的自行車道ID
+                        setState(() {
+                          highlightedYouBikeIds.clear(); // 清除高亮
+                          selectedCyclingRouteId = null; // 清除選中的自行車道ID
+                        });
+                      },
                       child: const Text('關閉'),
                     ),
                   ],
@@ -1090,8 +1101,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 判斷點擊位置是否在自行車道附近，並顯示其詳細資訊
+  // 判斷點擊位置是否在自行車道附近，並顯示其詳細資訊
   void _handleMapTap(TapPosition tapPosition, LatLng latLng) {
-    if (!showYoubike && cyclingroutes.isNotEmpty) {
+    // 不再判斷 showYoubike，直接處理自行車道點擊
+    if (cyclingroutes.isNotEmpty) {
       double minDistanceSq = double.infinity;
       Map<String, dynamic>? closestRoute;
 
@@ -1121,8 +1134,9 @@ class _HomePageState extends State<HomePage> {
           selectedCyclingRouteId = null;
         });
       }
-    } else if (showYoubike) {
-      // 如果是 YouBike 模式，點擊地圖空白處可以取消選中的 YouBike 標記
+    }
+    // YouBike 模式下點擊空白處取消選中標記的功能保留
+    if (showYoubike) {
       setState(() {
         selectedMarkerId = null;
       });
