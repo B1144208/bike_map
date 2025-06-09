@@ -321,29 +321,28 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // 新增：計算路線附近的YouBike站點
-  Set<int> _calculateNearbyYouBikeStations(List<dynamic> coordinates) {
-    Set<int> nearbyStations = {};
+  // 獲取路線附近的YouBike站點 (新的方法，從API獲取)
+  Future<void> _fetchNearbyYouBikeStations(int crid) async {
+    final response = await http.get(Uri.parse('$baseUrl/yb_near_cr?crid=$crid'));
 
-    // 走訪整條自行車道的所有點，找出 1km 內的 YouBike 站點
-    for (final point in coordinates) {
-      final pointLat = double.tryParse(point[1].toString());
-      final pointLng = double.tryParse(point[0].toString());
-      if (pointLat == null || pointLng == null) continue;
-
-      for (final youbikePoint in youbikes) {
-        final ybLat = double.tryParse(youbikePoint['Latitude'].toString());
-        final ybLng = double.tryParse(youbikePoint['Longitude'].toString());
-        if (ybLat == null || ybLng == null) continue;
-
-        final distance = _calculateDistance(pointLat, pointLng, ybLat, ybLng);
-        if (distance <= 1000) { // 1000 公尺內
-          nearbyStations.add(int.parse(youbikePoint['YBID'].toString()));
-        }
+    if (response.statusCode == 200) {
+      final List<dynamic> nearbyData = jsonDecode(response.body);
+      print('從 API 獲取到的附近 YouBike 數據：$nearbyData');
+      final Set<int> nearbyStations = {};
+      for (final item in nearbyData) {
+        nearbyStations.add(item['YBID']);
       }
+      setState(() {
+        highlightedYouBikeIds = nearbyStations;
+        currentRouteRelatedYouBikeCount = nearbyStations.length;
+      });
+    } else {
+      setState(() {
+        highlightedYouBikeIds.clear();
+        currentRouteRelatedYouBikeCount = 0;
+      });
+      print('Failed to load nearby YouBike stations: ${response.statusCode}');
     }
-
-    return nearbyStations;
   }
 
   // 建立列表項目
@@ -439,7 +438,7 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             isThreeLine: true,
-            onTap: () {
+            onTap: () async {
               setState(() {
                 selectedCyclingRouteId = item['CRID'];
 
@@ -452,13 +451,10 @@ class _HomePageState extends State<HomePage> {
                   if (lat != null && lng != null) {
                     mapController.move(LatLng(lat, lng), 15.0);
                   }
-
-                  // 計算附近的YouBike站點並更新高亮
-                  final nearbyStations = _calculateNearbyYouBikeStations(coordinates);
-                  highlightedYouBikeIds = nearbyStations;
-                  currentRouteRelatedYouBikeCount = nearbyStations.length;
                 }
               });
+              // 點擊列表項時也獲取相關YouBike站點
+              await _fetchNearbyYouBikeStations(item['CRID']);
             }
         ),
       );
@@ -929,6 +925,9 @@ class _HomePageState extends State<HomePage> {
       locallsFavorited = false;
     }
 
+    // 在顯示對話框前先獲取相關YouBike站點數據
+    await _fetchNearbyYouBikeStations(data['CRID']);
+
     showDialog(
       context: context,
       builder: (context) {
@@ -1098,7 +1097,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 判斷點擊位置是否在自行車道附近，並顯示其詳細資訊
-  void _handleMapTap(TapPosition tapPosition, LatLng latLng) {
+  void _handleMapTap(TapPosition tapPosition, LatLng latLng) async { // Make it async
     // 不再判斷 showYoubike，直接處理自行車道點擊
     if (cyclingroutes.isNotEmpty) {
       double minDistanceSq = double.infinity;
@@ -1120,16 +1119,11 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (closestRoute != null) {
-        // 計算並設定選中路線的相關YouBike站點
-        final coordinates = closestRoute['Coordinates'];
-        if (coordinates != null && coordinates.isNotEmpty) {
-          final nearbyStations = _calculateNearbyYouBikeStations(coordinates);
-          setState(() {
-            selectedCyclingRouteId = int.parse(closestRoute!['CRID'].toString());
-            highlightedYouBikeIds = nearbyStations;
-            currentRouteRelatedYouBikeCount = nearbyStations.length;
-          });
-        }
+        // Fetch and set selected route's related YouBike stations
+        setState(() {
+          selectedCyclingRouteId = int.parse(closestRoute!['CRID'].toString());
+        });
+        await _fetchNearbyYouBikeStations(closestRoute['CRID']); // Call the new fetch method
         _showCyclingRouteDetails(closestRoute);
       } else {
         // 如果沒有點中任何自行車道，清除選中的自行車道ID
