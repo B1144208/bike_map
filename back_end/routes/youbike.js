@@ -45,59 +45,6 @@ router.get('/', (req, res, next) => {
     });
 });
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-router.get('/isChange', (req, res, next) => {
-    
-
-    let sql = `
-    SELECT 
-        youbike.YBID, youbike.Name, youbike.Longitude, youbike.Latitude 
-    FROM youbike 
-    WHERE isChange=0
-    `;
-
-    let params = [];
-
-    pool.query(sql, params, (err, result)=>{
-        if (err) {
-            console.log(err);
-            return next(err);
-        }
-        res.json(result);
-    });
-});
-
-router.put('/updateYBTown/:ybid', (req, res, next) => {
-    const ybid = req.params.ybid;
-    const { TownID } = req.body;
-
-
-    if (!TownID) {
-        return res.status(400).json({ message: 'TownID 為必填項目' }); // 確保 TownID 存在
-    }
-
-
-    const sql = `
-        UPDATE youbike 
-        SET TownID = ?, isChange = TRUE
-        WHERE YBID = ?
-    `;
-    const params = [TownID, ybid];
-
-    pool.query(sql, params, (err, result) => {
-        if (err) return next(err);
-        res.json({ message: '更新 Youbike 成功' });
-    });
-});
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
 // Insert a youbike
 router.post('/insertYoubike', (req, res, next) => {
     const { TownID, Name, Longitude, Latitude } = req.body;
@@ -143,5 +90,55 @@ router.delete('/deleteYoubike/:ybid', (req, res, next) => {
         res.json({ message: '刪除 Youbike 成功' });
     });
 });
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///將 isChange=0 的 youbike.TownID 更新
+router.get('/isChange', (req, res, next) => {
+    
+
+    let sql = `
+    SELECT 
+        youbike.YBID, youbike.Name, youbike.Longitude, youbike.Latitude 
+    FROM youbike 
+    WHERE isChange=0
+    `;
+
+    let params = [];
+
+    pool.query(sql, params, (err, result)=>{
+        if (err) {
+            console.log(err);
+            return next(err);
+        }
+        res.json(result);
+    });
+});
+
+router.put('/updateYBTown/:ybid', (req, res, next) => {
+    const ybid = req.params.ybid;
+    const { TownID } = req.body;
+
+
+    if (!TownID) {
+        return res.status(400).json({ message: 'TownID 為必填項目' }); // 確保 TownID 存在
+    }
+
+
+    const sql = `
+        UPDATE youbike 
+        SET TownID = ?, isChange = TRUE
+        WHERE YBID = ?
+    `;
+    const params = [TownID, ybid];
+
+    pool.query(sql, params, (err, result) => {
+        if (err) return next(err);
+        res.json({ message: '更新 Youbike 成功' });
+    });
+});
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 module.exports = router;

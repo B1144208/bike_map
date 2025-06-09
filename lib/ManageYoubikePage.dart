@@ -67,7 +67,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+  ///將 isChange=0 的 youbike.TownID 更新
   // 新增函式：讀取 isChange API 並更新 editingYBID 和 tempLatlng
   Future<void> fetchIsChange() async {
     try {
