@@ -85,7 +85,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
   const sql = `
     INSERT INTO cyclingroute
     (CityID, TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [

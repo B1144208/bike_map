@@ -251,8 +251,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         coordinates.add([lng, lat]);
         coordinateLngController.clear();
         coordinateLatController.clear();
-        _updateRouteInfo(); // 更新路線資訊
       });
+      _updateRouteInfo(); // 更新路線資訊
     }
   }
 
@@ -260,15 +260,15 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   void _addCoordinateFromMap(LatLng point) {
     setState(() {
       coordinates.add([point.longitude, point.latitude]);
-      _updateRouteInfo(); // 更新路線資訊
     });
+    _updateRouteInfo(); // 更新路線資訊
   }
 
   void _removeCoordinate(int index) {
     setState(() {
       coordinates.removeAt(index);
-      _updateRouteInfo(); // 更新路線資訊
     });
+    _updateRouteInfo(); // 更新路線資訊
   }
 
   void _clearCoordinates() {
@@ -472,7 +472,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Direction': selectedDirection ?? '',
       'FinishDate': finishDateController.text,
       'ManagementID': managementID,
-      'Coordinates': coordinates,  // 新增：傳送座標資料
     };
 
     final response = await http.post(
@@ -485,8 +484,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final res = jsonDecode(response.body);
       final insertedId = res['insertedId'];
 
-      // 由於我們已經在主要 insert 中處理了 Geometry，
-      // 這裡仍保留點資料插入以維持與 cyclingroute_point 表的相容性
+      // 插入座標點資料到 cyclingroute_point 表
       for (final coord in coordinates) {
         final lng = double.tryParse(coord[0].toString());
         final lat = double.tryParse(coord[1].toString());
@@ -545,7 +543,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       'Direction': selectedDirection ?? '',
       'FinishDate': finishDateController.text,
       'ManagementID': managementID,
-      'Coordinates': coordinates,  // 新增：傳送座標資料
     };
 
     final response = await http.put(
@@ -944,7 +941,7 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                   child: const Text('搜尋'),
                 ),
                 const SizedBox(width: 20),
-                // 新增簡易/詳細模式切換按鈕
+                // 簡易/詳細模式切換按鈕
                 if (isAdding) ...[
                   Container(
                     decoration: BoxDecoration(
