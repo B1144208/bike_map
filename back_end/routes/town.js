@@ -27,6 +27,40 @@ router.get('/', (req, res, next)=> {
     })
 });
 
+router.get('/searchTownId', (req, res, next) => {
+    const cityName = req.query.cityname; // 從query中取得cityName
+    const townName = req.query.townname; // 從query中取得townName
+
+    // 檢查是否提供了 cityName 和 townName
+    if (!cityName || !townName) {
+        return res.status(400).json({ message: '輸入資料不正確，請提供 cityName 和 townName' });
+    }
+
+    // SQL 查詢語句，根據 cityName 和 townName 查詢對應的 TownID
+    const sql = `
+        SELECT town.TownID
+        FROM town
+        JOIN city ON town.CityID = city.CityID
+        WHERE city.CityName = ? AND town.TownName = ?
+    `;
+    const params = [cityName, townName];
+
+    pool.query(sql, params, (err, result) => {
+        if (err) {
+            console.log(err);
+            return next(err);
+        }
+
+        // 如果找不到資料，回傳錯誤訊息
+        if (result.length === 0) {
+            return res.status(404).json({ message: '找不到對應的 TownID' });
+        }
+
+        // 返回查詢到的結果，包含 TownID
+        res.json(result);
+    });
+});
+
 // 新增鄉鎮
 router.post('/insertTown', (req, res) => {
     const { CityID, TownName } = req.body;

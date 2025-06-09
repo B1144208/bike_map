@@ -23,12 +23,16 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   int? selectedCity;
   int? selectedTown;
   int? editingYBID;
+  String? editCity;
+  String? editTown;
+  String? editTownID;
   LatLng? editYBlatlng;
   LatLng? tempLatlng;
   bool isLoadingCities = true;
   bool isLoadingTowns = false;
   bool isLoadingYoubikes = true;
   bool isInsertUpdate = false;
+  String _selectedLocationName = '尚未選擇地區';
   
   
   // keyword
@@ -118,24 +122,225 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       throw Exception('Failed to load towns');
     }
   }
-  // 當經度或緯度改變時更新 tempLatlng
+  // ***********************************************************************************************************************************
+  // 查詢 TownID
+  Future<void> searchTownId() async {
+    
+    if (editCity==null || editTown==null) {
+      // 確保 cityName 和 townName 有被填寫
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('查詢失敗')),
+      );
+      return;
+    }
+    
+
+
+    ///////////////////////////////////////////////////
+    final response = await http.get(Uri.parse('$baseUrl/town/searchTownId?cityname=$editCity&townname=$editTown'));
+
+    if (response.statusCode == 200) {
+      final result = jsonDecode(response.body);
+
+        if (result.isNotEmpty) {
+          // 如果找到 TownID，將它儲存到 editTownID
+          setState(() {
+            editTownID = result[0]['TownID'].toString(); // 假設返回的 JSON 是一個包含 TownID 的數組
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('找不到對應的城市、鄉鎮')),
+          );
+        }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('查詢失敗，請稍後再試')),
+      );
+    }
+    //////////////////////////////////////////////////////
+
+
+
+    /*final url = Uri.parse('$baseUrl/town/searchTownId?cityname=$editCity&townname=$editTown');
+    
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+
+        if (result.isNotEmpty) {
+          // 如果找到 TownID，將它儲存到 editTownID
+          setState(() {
+            editTownID = result[0]['TownID'].toString(); // 假設返回的 JSON 是一個包含 TownID 的數組
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('查詢成功！')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('找不到對應的城市、鄉鎮')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('查詢失敗，請稍後再試')),
+        );
+      }
+    } catch (e) {
+      // 捕捉錯誤
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('發生錯誤，請檢查網絡')),
+      );
+    }*/
+  }
+
+  String fetchLocal() {
+    if (tempLatlng == null) return '無法取得地區';
+
+    const Distance distance = Distance();
+
+    double minTownDist = double.infinity;
+    double minCityDist = double.infinity;
+
+    Map<String, dynamic>? nearestTown;
+    Map<String, dynamic>? nearestCity;
+
+    for (var town in towns) {
+      if (town.containsKey('Latitude') && town.containsKey('Longitude')) {
+        final d = distance(
+          tempLatlng!,
+          LatLng(town['Latitude'] * 1.0, town['Longitude'] * 1.0),
+        );
+        if (d < minTownDist) {
+          minTownDist = d;
+          nearestTown = town;
+        }
+      }
+    }
+
+    for (var city in cities) {
+      if (city.containsKey('Latitude') && city.containsKey('Longitude')) {
+        final d = distance(
+          tempLatlng!,
+          LatLng(city['Latitude'] * 1.0, city['Longitude'] * 1.0),
+        );
+        if (d < minCityDist) {
+          minCityDist = d;
+          nearestCity = city;
+        }
+      }
+    }
+
+    // 使用 setState 更新 editCity 和 editTown
+    setState(() {
+      // 更新全域變數
+      editTown = nearestTown != null ? nearestTown['TownName'] : null;
+      editCity = nearestCity != null ? nearestCity['CityName'] : null;
+      _selectedLocationName = '選擇地區: ${editCity ?? '未知城市'} ${editTown ?? '未知鄉鎮'}';
+    });
+    return _selectedLocationName;
+
+    // 更新全域變數
+    /*editTown = nearestTown != null ? nearestTown['TownName'] : null;
+    editCity = nearestCity != null ? nearestCity['CityName'] : null;
+    //********************************************************************************************** */
+    print("editCity: $editCity, editTown: $editTown");
+
+    _selectedLocationName = '選擇地區: ${editCity ?? '未知城市'} ${editTown ?? '未知鄉鎮'}';
+    return _selectedLocationName;*/
+  }
+
   void updateLatLngFromTextControllers() {
     final longitude = double.tryParse(longitudeController.text);
     final latitude = double.tryParse(latitudeController.text);
-    
+
     if (longitude != null && latitude != null) {
       setState(() {
         tempLatlng = LatLng(latitude, longitude);
+
+        // 根據 tempLatlng 找到 city/town
+        _selectedLocationName = fetchLocal();
+      });
+    }
+
+    updateTextControllersFromLatLng();
+  }
+
+  // 反向地理編碼：將經緯度轉換為地址
+  Future<String> _getCityAndTownFromCoordinates(double lat, double lng) async {
+    try {
+      final url =
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1&accept-language=zh-TW';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'Flutter App'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['address'] != null) {
+          final addr = data['address'];
+
+          // 嘗試從結構化地址取得 city 和 town（台灣常用 city + suburb 或 city + town）
+          String city = addr['city'] ??
+                        addr['state'] ??      // 有些資料用 state 表示縣市（如：新竹縣）
+                        addr['county'] ??     // 有些資料用 county
+                        '未知城市';
+
+          String town = addr['town'] ??
+                        addr['city_district'] ?? 
+                        addr['suburb'] ?? 
+                        '未知鄉鎮';
+
+          // ****************************************************************************************************************
+          editCity = city;
+          editTown = town;
+          return '$city $town';
+        }
+      }
+    } catch (e) {
+      print('反向地理編碼錯誤: $e');
+    }
+
+    // 若失敗則回傳座標字串
+    return '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+  }
+
+
+  // 當 tempLatlng 改變時，更新經緯度輸入框
+  void updateTextControllersFromLatLng() async{
+    if (tempLatlng != null) {
+      // 更新輸入框內容
+      longitudeController.text = tempLatlng!.longitude.toString();
+      latitudeController.text = tempLatlng!.latitude.toString();
+
+      // 呼叫反向地理編碼 API
+      final address = await _getCityAndTownFromCoordinates(
+        tempLatlng!.latitude,
+        tempLatlng!.longitude,
+      );
+
+      // 更新畫面狀態
+      setState(() {
+        _selectedLocationName = '選擇地區: $address';
       });
     }
   }
 
-  // 當 tempLatlng 改變時，更新經緯度輸入框
-  void updateTextControllersFromLatLng() {
-    if (tempLatlng != null) {
-      longitudeController.text = tempLatlng!.longitude.toString();
-      latitudeController.text = tempLatlng!.latitude.toString();
-    }
+
+  String _getCityName(int? id) {
+    if (id == null) return '';
+    final match = cities.firstWhere((c) => c['CityID'] == id, orElse: () => null);
+    return match != null ? match['CityName'] : '';
+  }
+
+  String _getTownName(int? id) {
+    if (id == null) return '';
+    final match = towns.firstWhere((t) => t['TownID'] == id, orElse: () => null);
+    return match != null ? match['TownName'] : '';
   }
   // youbike 標記
   Widget _youbikeMarker() {
@@ -184,12 +389,12 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       child: FlutterMap(
         mapController: mapController,
         options: MapOptions(
-          onTap: (tapPosition, point) {
+          onTap: (tapPosition, point) async{
             // 當地圖被點擊時，儲存點擊的座標並更新 tempLatlng
             setState(() {
               tempLatlng = point;  // 儲存點擊的座標
-              updateTextControllersFromLatLng();
             });
+            updateTextControllersFromLatLng();
           },
           initialCameraFit: CameraFit.bounds(
             bounds: LatLngBounds(
@@ -219,41 +424,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       child: Column(
         children: [
           const Divider(height: 32, thickness: 1),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              DropdownButton<int>(
-                value: selectedCity,
-                hint: const Text('選擇城市'),
-                onChanged: (value) {
-                  setState(() {
-                    selectedCity = value;
-                    selectedTown = null;
-                    fetchTowns();
-                  });
-                },
-                items: cities.map<DropdownMenuItem<int>>((city) {
-                  return DropdownMenuItem<int>(
-                    value: city['CityID'],
-                    child: Text(city['CityName']),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(width: 30),
-              DropdownButton<int>(
-                value: selectedTown,
-                hint: const Text('選擇鄉鎮'),
-                onChanged: (value) {
-                  setState(() => selectedTown = value);
-                },
-                items: towns.map<DropdownMenuItem<int>>((town) {
-                  return DropdownMenuItem<int>(
-                    value: town['TownID'],
-                    child: Text(town['TownName']),
-                  );
-                }).toList(),
-              ),
-            ],
+          Text(
+            _selectedLocationName,
+            style: const TextStyle(fontSize: 16),
           ),
           TextField(
             controller: nameController,
@@ -288,6 +461,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                     isInsertUpdate = false;
                     editingYBID = null;
                     editYBlatlng = null;
+                    // ***************************************************************************************************************
+                    //editCity = null;
+                    //editTown = null;
                     nameController.clear();
                     longitudeController.clear();
                     latitudeController.clear();
@@ -304,7 +480,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   
   // 新增 youbikes
   Future<void> _insertYoubike() async {
-    if (selectedTown == null ||
+    await searchTownId();
+    if (editTownID == null ||
         nameController.text.isEmpty ||
         longitudeController.text.isEmpty ||
         latitudeController.text.isEmpty) {
@@ -315,7 +492,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
     }
 
     final body = {
-      'TownID': selectedTown,
+      'TownID': editTownID,
       'Name': nameController.text,
       'Longitude': double.tryParse(longitudeController.text),
       'Latitude': double.tryParse(latitudeController.text),
@@ -333,7 +510,11 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       );
       setState(() {
         isInsertUpdate = false;
-        
+        editingYBID = null;
+        editYBlatlng = null;
+        // ***************************************************************************************************************
+        //editCity = null;
+        //editTown = null;
         nameController.clear();
         longitudeController.clear();
         latitudeController.clear();
@@ -348,7 +529,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
 
   // 修改 youbikes
   Future<void> _updateYoubike() async {
-    if (editingYBID == null || selectedTown == null || nameController.text.isEmpty || longitudeController.text.isEmpty || latitudeController.text.isEmpty) {
+    await searchTownId();
+    if (editingYBID == null || editTownID == null || nameController.text.isEmpty || longitudeController.text.isEmpty || latitudeController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('輸入不完整')),
       );
@@ -356,7 +538,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
     }
 
     final body = {
-      'TownID': selectedTown,
+      'TownID': editTownID,
       'Name': nameController.text,
       'Longitude': double.tryParse(longitudeController.text),
       'Latitude': double.tryParse(latitudeController.text),
@@ -376,6 +558,9 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         isInsertUpdate = false;
         editingYBID = null;
         editYBlatlng = null;
+        // ***************************************************************************************************************
+        //editCity = null;
+        //editTown = null;
         nameController.clear();
         longitudeController.clear();
         latitudeController.clear();
@@ -540,21 +725,23 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () {
+                                      onPressed: () async {
                                         setState(() {
                                           editingYBID = item['YBID'];
                                           editYBlatlng = LatLng(item['Latitude'], item['Longitude']);
+                                          tempLatlng = LatLng(item['Latitude'], item['Longitude']);
                                           isInsertUpdate = true;
                                           selectedCity = item['CityID'];
-                                          fetchTowns().then((_) {
-                                            setState(() {
-                                              selectedTown = item['TownID'];
-                                            });
-                                          });
                                           nameController.text = item['Name'] ?? '';
                                           longitudeController.text = item['Longitude'].toString();
                                           latitudeController.text = item['Latitude'].toString();
                                         });
+                                        await fetchTowns(); // 等待鄉鎮資料加載完
+                                        setState(() {
+                                          selectedTown = item['TownID'];
+                                        });
+
+                                        updateTextControllersFromLatLng(); // 呼叫來更新地區文字
                                       },
                                     ),
                                     IconButton(
