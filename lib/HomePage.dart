@@ -44,7 +44,8 @@ class _HomePageState extends State<HomePage> {
   int? selectedMarkerId; // YouBike 的選中標記 ID
   int? selectedCyclingRouteId; // CyclingRoute 的選中路線 ID
 
-
+  // 新增：儲存當前選中路線的相關YouBike站點數量
+  int currentRouteRelatedYouBikeCount = 0;
 
   // 分頁相關
   final int itemsPerPage = 20;
@@ -320,6 +321,31 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  // 新增：計算路線附近的YouBike站點
+  Set<int> _calculateNearbyYouBikeStations(List<dynamic> coordinates) {
+    Set<int> nearbyStations = {};
+
+    // 走訪整條自行車道的所有點，找出 1km 內的 YouBike 站點
+    for (final point in coordinates) {
+      final pointLat = double.tryParse(point[1].toString());
+      final pointLng = double.tryParse(point[0].toString());
+      if (pointLat == null || pointLng == null) continue;
+
+      for (final youbikePoint in youbikes) {
+        final ybLat = double.tryParse(youbikePoint['Latitude'].toString());
+        final ybLng = double.tryParse(youbikePoint['Longitude'].toString());
+        if (ybLat == null || ybLng == null) continue;
+
+        final distance = _calculateDistance(pointLat, pointLng, ybLat, ybLng);
+        if (distance <= 1000) { // 1000 公尺內
+          nearbyStations.add(int.parse(youbikePoint['YBID'].toString()));
+        }
+      }
+    }
+
+    return nearbyStations;
+  }
+
   // 建立列表項目
   Widget _buildListItem(dynamic item) {
     if (showYoubike) {
@@ -427,31 +453,13 @@ class _HomePageState extends State<HomePage> {
                     mapController.move(LatLng(lat, lng), 15.0);
                   }
 
-                  // 清空原本的高亮清單
-                  highlightedYouBikeIds.clear();
-
-                  // 走訪整條自行車道的所有點，找出 1km 內的 YouBike 站點
-                  for (final point in coordinates) {
-                    final pointLat = double.tryParse(point[1].toString());
-                    final pointLng = double.tryParse(point[0].toString());
-                    if (pointLat == null || pointLng == null) continue;
-
-                    for (final youbikePoint in youbikes) {
-                      final ybLat = double.tryParse(youbikePoint['Latitude'].toString());
-                      final ybLng = double.tryParse(youbikePoint['Longitude'].toString());
-                      if (ybLat == null || ybLng == null) continue;
-
-                      final distance = _calculateDistance(pointLat, pointLng, ybLat, ybLng);
-                      if (distance <= 1000) { // 單位是 km
-                        highlightedYouBikeIds.add(int.parse(youbikePoint['YBID'].toString()));
-                      }
-                    }
-                  }
+                  // 計算附近的YouBike站點並更新高亮
+                  final nearbyStations = _calculateNearbyYouBikeStations(coordinates);
+                  highlightedYouBikeIds = nearbyStations;
+                  currentRouteRelatedYouBikeCount = nearbyStations.length;
                 }
               });
             }
-
-
         ),
       );
     }
@@ -481,6 +489,8 @@ class _HomePageState extends State<HomePage> {
                       currentPage = 0;
                       selectedMarkerId = null; // 切換時清除 YouBike 選擇狀態
                       selectedCyclingRouteId = null; // 切換時清除自行車道選擇狀態
+                      highlightedYouBikeIds.clear(); // 清除高亮狀態
+                      currentRouteRelatedYouBikeCount = 0; // 重置計數
                     });
                   },
                   constraints: const BoxConstraints(
@@ -627,6 +637,8 @@ class _HomePageState extends State<HomePage> {
                 setState(() {
                   currentPage = 0;
                   selectedCyclingRouteId = null; // ✅ 清除已選的路線
+                  highlightedYouBikeIds.clear(); // 清除高亮狀態
+                  currentRouteRelatedYouBikeCount = 0; // 重置計數
                 });
                 await loadAllData();
               },
@@ -779,11 +791,11 @@ class _HomePageState extends State<HomePage> {
           height: 60,
           child: GestureDetector(
             onTap: () async {
-              // **關鍵修改點 1：更新 selectedMarkerId 並清除 highlightedYouBikeIds**
-              // 點擊地圖上的 YouBike 站點時，將其設定為選中，並清除自行車道相關的高亮
+              // **關鍵修改點 1：更新 selectedMarkerId 但不清除 highlightedYouBikeIds**
+              // 點擊地圖上的 YouBike 站點時，將其設定為選中，但保持自行車道相關的高亮
               setState(() {
                 selectedMarkerId = currentYoubikeId;
-                highlightedYouBikeIds.clear(); // 清除所有因自行車道而高亮的站點
+                // 移除這行：highlightedYouBikeIds.clear(); // 不再清除高亮狀態
               });
 
               // 原始的收藏邏輯和對話框顯示保持不變
@@ -902,7 +914,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 新增一個方法來顯示自行車道詳細資訊
+  // 修改一個方法來顯示自行車道詳細資訊
   Future<void> _showCyclingRouteDetails(dynamic data) async {
     bool isLog = await IsLogin();
     bool locallsFavorited = false;
@@ -916,20 +928,6 @@ class _HomePageState extends State<HomePage> {
     } else {
       locallsFavorited = false;
     }
-
-    // 提取與此自行車道相關的 YouBike 站點 ID
-    // 假設 data['RelatedYouBikeStations'] 是一個包含 YouBike ID 的列表
-    final List<int> relatedYouBikeSIDs = (data['RelatedYouBikeStations'] as List<dynamic>?)
-        ?.map((e) => int.parse(e.toString()))
-        .toList() ??
-        []; // 確保處理可能為 null 的情況
-
-    // 在顯示對話框之前，更新高亮狀態
-    // 這會觸發地圖重新繪製，使相關的 YouBike 站點變色
-    setState(() {
-      highlightedYouBikeIds.clear(); // 清除之前的高亮
-      highlightedYouBikeIds.addAll(relatedYouBikeSIDs); // 添加新的高亮站點
-    });
 
     showDialog(
       context: context,
@@ -945,7 +943,7 @@ class _HomePageState extends State<HomePage> {
                     '長　　度: ${data['Length'] ?? '無資料'} 公尺\n'
                     '完成日期: ${data['FinishDate'] ?? '無資料'}\n'
                     '管理單位: ${data['ManagementName'] ?? '無資料'}\n'
-                    '相關YouBike站點數量: ${relatedYouBikeSIDs.length}\n', // 添加顯示相關站點數量
+                    '相關YouBike站點數量: $currentRouteRelatedYouBikeCount\n', // 使用儲存的計數
               ),
               actions: [
                 Row(
@@ -1008,6 +1006,7 @@ class _HomePageState extends State<HomePage> {
                         setState(() {
                           highlightedYouBikeIds.clear(); // 清除高亮
                           selectedCyclingRouteId = null; // 清除選中的自行車道ID
+                          currentRouteRelatedYouBikeCount = 0; // 重置計數
                         });
                       },
                       child: const Text('關閉'),
@@ -1040,8 +1039,6 @@ class _HomePageState extends State<HomePage> {
     final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return (R * c).toDouble(); // 強制轉型為 double
   }
-
-
 
   double _deg2rad(double deg) {
     return deg * (pi / 180);
@@ -1101,7 +1098,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 判斷點擊位置是否在自行車道附近，並顯示其詳細資訊
-  // 判斷點擊位置是否在自行車道附近，並顯示其詳細資訊
   void _handleMapTap(TapPosition tapPosition, LatLng latLng) {
     // 不再判斷 showYoubike，直接處理自行車道點擊
     if (cyclingroutes.isNotEmpty) {
@@ -1124,14 +1120,23 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (closestRoute != null) {
-        setState(() {
-          selectedCyclingRouteId = int.parse(closestRoute!['CRID'].toString()); // 更新選中ID
-        });
+        // 計算並設定選中路線的相關YouBike站點
+        final coordinates = closestRoute['Coordinates'];
+        if (coordinates != null && coordinates.isNotEmpty) {
+          final nearbyStations = _calculateNearbyYouBikeStations(coordinates);
+          setState(() {
+            selectedCyclingRouteId = int.parse(closestRoute!['CRID'].toString());
+            highlightedYouBikeIds = nearbyStations;
+            currentRouteRelatedYouBikeCount = nearbyStations.length;
+          });
+        }
         _showCyclingRouteDetails(closestRoute);
       } else {
         // 如果沒有點中任何自行車道，清除選中的自行車道ID
         setState(() {
           selectedCyclingRouteId = null;
+          highlightedYouBikeIds.clear();
+          currentRouteRelatedYouBikeCount = 0;
         });
       }
     }
@@ -1216,8 +1221,6 @@ class _HomePageState extends State<HomePage> {
                     })
                         .toList(),
                   )
-
-
               ],
             ),
           ),
