@@ -60,7 +60,112 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
     super.initState();
     fetchCities();
     fetchYoubikes();
+
+    ////////////////////////////////////////////////
+    //fetchIsChange();
+    
   }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // 新增函式：讀取 isChange API 並更新 editingYBID 和 tempLatlng
+  Future<void> fetchIsChange() async {
+    try {
+      // 先呼叫 isChange API
+      final response = await http.get(Uri.parse('$baseUrl/youbike/isChange'));
+
+      if (response.statusCode == 200) {
+        // 將結果解析
+        final data = jsonDecode(response.body);
+
+        if (data.isNotEmpty) {
+          for (var item in data) {
+
+            // 更新每一筆資料的 YBID 和經緯度
+            final ybid = item['YBID'];
+            final latitude = item['Latitude'];
+            final longitude = item['Longitude'];
+
+            // 更新 UI 狀態
+            setState(() {
+              // 如果要顯示每一筆資料的經緯度，也可以在這裡更新
+              editingYBID = ybid;
+              tempLatlng = LatLng(latitude, longitude);
+            });
+
+            // 呼叫 _getCityAndTownFromCoordinates 更新城市和鄉鎮
+            await _getCityAndTownFromCoordinates(latitude, longitude);
+            await searchTownId();
+            print("editTownID: $editTownID\teditCity: $editCity\teditTown: $editTown");
+
+            // 呼叫 _updateYBTown 更新 TownID
+            await _updateYBTown();
+          }
+
+          // 顯示處理完成訊息
+          
+          print('資料已成功更新');
+          
+        } else {
+          // 如果沒有找到對應資料，顯示錯誤訊息
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('找不到未變更的資料')),
+          );
+        }
+      } else {
+        // 如果 API 請求失敗，顯示錯誤訊息
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('無法獲取資料，請稍後再試')),
+        );
+      }
+    } catch (e) {
+      // 捕捉異常並顯示錯誤訊息
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('錯誤: $e')),
+      );
+    }
+  }
+
+  // 更新 TownID
+  Future<void> _updateYBTown() async {
+    // 如果 editingYBID 是 null，則不進行任何更新
+
+    if (editingYBID == null) return;
+
+
+    
+    // 假設 editTownID 已經從 _getCityAndTownFromCoordinates 獲取
+    if (editTownID == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('未找到對應的 TownID')),
+      );
+      return;
+    }
+
+    try {
+      final body = {
+        'TownID': editTownID,
+      };
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/youbike/updateYBTown/$editingYBID'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        
+      } else {
+        throw Exception('更新 TownID 失敗');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('錯誤: $e')),
+      );
+    }
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   Future<void> fetchYoubikes() async {
     String url = '$baseUrl/youbike';
