@@ -28,6 +28,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   bool isAdding = false;
   bool isSimpleMode = true; // 新增：簡易/詳細模式切換
 
+  bool isLoadingAddress = false; // 新增：地址載入狀態
+
   final int itemsPerPage = 50;
   int currentPage = 0;
 
@@ -144,6 +146,50 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     return deg * (pi / 180);
   }
 
+  // 反向地理編碼：將經緯度轉換為地址
+  Future<String> _getAddressFromCoordinates(double lat, double lng) async {
+    try {
+      // 使用 Nominatim OpenStreetMap API 進行反向地理編碼
+      final url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1&accept-language=zh-TW';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'Flutter App'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['display_name'] != null) {
+          // 提取並格式化地址
+          String address = data['display_name'];
+
+          // 如果有結構化地址資料，優先使用
+          if (data['address'] != null) {
+            final addr = data['address'];
+            List<String> addressParts = [];
+
+            // 按台灣地址格式組合
+            if (addr['suburb'] != null) addressParts.add(addr['suburb']);
+            if (addr['road'] != null) addressParts.add(addr['road']);
+            if (addr['house_number'] != null) addressParts.add(addr['house_number']);
+
+            if (addressParts.isNotEmpty) {
+              address = addressParts.join('');
+            }
+          }
+
+          return address;
+        }
+      }
+    } catch (e) {
+      print('反向地理編碼錯誤: $e');
+    }
+
+    // 如果無法取得地址，回傳座標
+    return '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
+  }
+
   // 計算總路線長度
   double _calculateTotalLength() {
     if (coordinates.length < 2) return 0;
@@ -161,16 +207,39 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   }
 
   // 更新起點、終點和長度
-  void _updateRouteInfo() {
+  Future<void> _updateRouteInfo() async {
     if (coordinates.isNotEmpty) {
-      // 更新起點（第一個點的反向地址解析，這裡簡化為座標）
-      startController.text = '${coordinates.first[1].toStringAsFixed(6)}, ${coordinates.first[0].toStringAsFixed(6)}';
-
-      // 更新終點（最後一個點的反向地址解析，這裡簡化為座標）
-      endController.text = '${coordinates.last[1].toStringAsFixed(6)}, ${coordinates.last[0].toStringAsFixed(6)}';
+      setState(() {
+        isLoadingAddress = true;
+      });
 
       // 更新長度
       lengthController.text = _calculateTotalLength().round().toString();
+
+      try {
+        // 更新起點地址（第一個點）
+        final startLat = coordinates.first[1];
+        final startLng = coordinates.first[0];
+        final startAddress = await _getAddressFromCoordinates(startLat, startLng);
+        startController.text = startAddress;
+
+        // 更新終點地址（最後一個點）
+        if (coordinates.length > 1) {
+          final endLat = coordinates.last[1];
+          final endLng = coordinates.last[0];
+          final endAddress = await _getAddressFromCoordinates(endLat, endLng);
+          endController.text = endAddress;
+        } else {
+          // 如果只有一個點，終點和起點相同
+          endController.text = startController.text;
+        }
+      } catch (e) {
+        print('更新地址錯誤: $e');
+      } finally {
+        setState(() {
+          isLoadingAddress = false;
+        });
+      }
     }
   }
 
@@ -372,8 +441,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       final parsed = coordList.map<List<double>>((c) => [c[0] as double, c[1] as double]).toList();
       setState(() {
         coordinates = parsed;
-        _updateRouteInfo(); // 載入座標後更新路線資訊
       });
+      _updateRouteInfo(); // 載入座標後更新路線資訊
     }
   }
 
@@ -651,8 +720,35 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         const SizedBox(height: 16),
 
         if (coordinates.isNotEmpty) ...[
-          Text('已添加 ${coordinates.length} 個座標點'),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('已添加 ${coordinates.length} 個座標點'),
+              if (isLoadingAddress) ...[
+                const SizedBox(width: 10),
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 5),
+                const Text('載入地址中...', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ],
+          ),
           const SizedBox(height: 8),
+          if (startController.text.isNotEmpty) ...[
+            Text('起點: ${startController.text}', style: const TextStyle(fontSize: 12, color: Colors.green)),
+            const SizedBox(height: 4),
+          ],
+          if (endController.text.isNotEmpty) ...[
+            Text('終點: ${endController.text}', style: const TextStyle(fontSize: 12, color: Colors.red)),
+            const SizedBox(height: 4),
+          ],
+          if (lengthController.text.isNotEmpty) ...[
+            Text('總長度: ${lengthController.text} 公尺', style: const TextStyle(fontSize: 12, color: Colors.blue)),
+            const SizedBox(height: 8),
+          ],
           ElevatedButton(
             onPressed: _clearCoordinates,
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
