@@ -122,7 +122,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       throw Exception('Failed to load towns');
     }
   }
-  // ***********************************************************************************************************************************
   // 查詢 TownID
   Future<void> searchTownId() async {
     
@@ -133,10 +132,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       );
       return;
     }
-    
-
-
-    ///////////////////////////////////////////////////
     final response = await http.get(Uri.parse('$baseUrl/town/searchTownId?cityname=$editCity&townname=$editTown'));
 
     if (response.statusCode == 200) {
@@ -157,42 +152,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         const SnackBar(content: Text('查詢失敗，請稍後再試')),
       );
     }
-    //////////////////////////////////////////////////////
-
-
-
-    /*final url = Uri.parse('$baseUrl/town/searchTownId?cityname=$editCity&townname=$editTown');
-    
-    try {
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        final result = jsonDecode(response.body);
-
-        if (result.isNotEmpty) {
-          // 如果找到 TownID，將它儲存到 editTownID
-          setState(() {
-            editTownID = result[0]['TownID'].toString(); // 假設返回的 JSON 是一個包含 TownID 的數組
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('查詢成功！')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('找不到對應的城市、鄉鎮')),
-          );
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('查詢失敗，請稍後再試')),
-        );
-      }
-    } catch (e) {
-      // 捕捉錯誤
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('發生錯誤，請檢查網絡')),
-      );
-    }*/
   }
 
   String fetchLocal() {
@@ -240,15 +199,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
       _selectedLocationName = '選擇地區: ${editCity ?? '未知城市'} ${editTown ?? '未知鄉鎮'}';
     });
     return _selectedLocationName;
-
-    // 更新全域變數
-    /*editTown = nearestTown != null ? nearestTown['TownName'] : null;
-    editCity = nearestCity != null ? nearestCity['CityName'] : null;
-    //********************************************************************************************** */
-    print("editCity: $editCity, editTown: $editTown");
-
-    _selectedLocationName = '選擇地區: ${editCity ?? '未知城市'} ${editTown ?? '未知鄉鎮'}';
-    return _selectedLocationName;*/
   }
 
   void updateLatLngFromTextControllers() {
@@ -295,7 +245,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                         addr['suburb'] ?? 
                         '未知鄉鎮';
 
-          // ****************************************************************************************************************
           editCity = city;
           editTown = town;
           return '$city $town';
@@ -331,17 +280,7 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
   }
 
 
-  String _getCityName(int? id) {
-    if (id == null) return '';
-    final match = cities.firstWhere((c) => c['CityID'] == id, orElse: () => null);
-    return match != null ? match['CityName'] : '';
-  }
 
-  String _getTownName(int? id) {
-    if (id == null) return '';
-    final match = towns.firstWhere((t) => t['TownID'] == id, orElse: () => null);
-    return match != null ? match['TownName'] : '';
-  }
   // youbike 標記
   Widget _youbikeMarker() {
     
@@ -461,9 +400,6 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
                     isInsertUpdate = false;
                     editingYBID = null;
                     editYBlatlng = null;
-                    // ***************************************************************************************************************
-                    //editCity = null;
-                    //editTown = null;
                     nameController.clear();
                     longitudeController.clear();
                     latitudeController.clear();
@@ -512,9 +448,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         isInsertUpdate = false;
         editingYBID = null;
         editYBlatlng = null;
-        // ***************************************************************************************************************
-        //editCity = null;
-        //editTown = null;
+        editCity = null;
+        editTown = null;
         nameController.clear();
         longitudeController.clear();
         latitudeController.clear();
@@ -558,9 +493,8 @@ class _ManagerYoubikeState extends State<ManageYoubikePage> {
         isInsertUpdate = false;
         editingYBID = null;
         editYBlatlng = null;
-        // ***************************************************************************************************************
-        //editCity = null;
-        //editTown = null;
+        editCity = null;
+        editTown = null;
         nameController.clear();
         longitudeController.clear();
         latitudeController.clear();
