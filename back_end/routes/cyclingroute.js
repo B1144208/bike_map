@@ -9,18 +9,19 @@ router.get('/', async (req, res, next) => {
     const keyword = req.query.keyword;
 
     let sql = `
-        SELECT cyclingroute.CRID, city.CityID, city.CityName, town.TownID, town.TownName,
+        SELECT cyclingroute.CRID, town.CityID, city.CityName, town.TownID, town.TownName,
                management.ManagementID, management.ManagementName, cyclingroute.Name,
                cyclingroute.AlternateNames, cyclingroute.Start,
-               cyclingroute.End, cyclingroute.Length, cyclingroute.Direction, cyclingroute.FinishDate
+               cyclingroute.End, cyclingroute.Length, cyclingroute.Direction,
+               cyclingroute.FinishDate, cyclingroute.isChange
         FROM cyclingroute
-        LEFT JOIN city ON cyclingroute.CityID = city.CityID
         LEFT JOIN town ON cyclingroute.TownID = town.TownID
+        LEFT JOIN city ON town.CityID = city.CityID
         LEFT JOIN management ON cyclingroute.ManagementID = management.ManagementID
         WHERE 1
     `;
     let params = [];
-    
+
 
     if (keyword) {
         sql += ' AND cyclingroute.Name LIKE ?';
@@ -32,7 +33,7 @@ router.get('/', async (req, res, next) => {
         sql += ' AND cyclingroute.TownID = ?';
         params = [townID];
     } else if (cityID) {
-        sql += ' AND cyclingroute.CityID = ?';
+        sql += ' AND town.CityID = ?';
         params = [cityID];
     }
 
@@ -63,7 +64,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ✅ Insert cyclingroute
+// ✅ Insert cyclingroute (支援 isChange 欄位)
 router.post('/insertCyclingroute', (req, res, next) => {
   const {
     CityID,
@@ -75,21 +76,21 @@ router.post('/insertCyclingroute', (req, res, next) => {
     End,
     Length,
     Direction,
-    FinishDate
+    FinishDate,
+    isChange
   } = req.body;
 
-  if (!CityID || !Name ) {
+  if (!Name) {
     return res.status(400).json({ message: '缺少必要欄位' });
   }
 
   const sql = `
     INSERT INTO cyclingroute
-    (CityID, TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID)
+    (TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID, isChange)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
-    CityID,
     TownID || null,
     Name,
     AlternateNames || null,
@@ -99,6 +100,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
     Direction || null,
     FinishDate || null,
     ManagementID || null,
+    isChange !== undefined ? isChange : (TownID ? 1 : 0), // 根據 TownID 設置 isChange
   ];
 
   pool.query(sql, params, (err, result) => {
@@ -108,7 +110,7 @@ router.post('/insertCyclingroute', (req, res, next) => {
 });
 
 
-// ✅ Update cyclingroute
+// ✅ Update cyclingroute (支援 isChange 欄位)
 router.put('/updateCyclingroute/:crid', (req, res, next) => {
   const crid = req.params.crid;
   const {
@@ -117,23 +119,22 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
     ManagementID,
     Name,
     AlternateNames,
-
     Start,
     End,
     Length,
     Direction,
-    FinishDate
+    FinishDate,
+    isChange
   } = req.body;
 
   const sql = `
     UPDATE cyclingroute
-    SET CityID = ?, TownID = ?, Name = ?, AlternateNames = ?,
-    Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?
+    SET TownID = ?, Name = ?, AlternateNames = ?,
+    Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?, isChange = ?
     WHERE CRID = ?
   `;
 
     const params = [
-        CityID,
         TownID || null,
         Name,
         AlternateNames || null,
@@ -143,6 +144,7 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
         Direction || null,
         FinishDate || null,
         ManagementID || null,
+        isChange !== undefined ? isChange : (TownID ? 1 : 0), // 根據 TownID 設置 isChange
         crid,
     ];
 

@@ -20,22 +20,22 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   List<dynamic> cyclingroutes = [];
   List<List<double>> coordinates = [];
 
+  // 路線分區相關
+  List<Map<String, String>> routeAreas = []; // 存放 {cityName, townName}
+
   int? selectedCity;
   int? selectedTown;
   int? editingCRID;
 
   bool isLoading = true;
   bool isAdding = false;
-  bool isSimpleMode = true; // 新增：簡易/詳細模式切換
-
-  bool isLoadingAddress = false; // 新增：地址載入狀態
+  bool isSimpleMode = true;
+  bool isLoadingAddress = false;
 
   final int itemsPerPage = 50;
   int currentPage = 0;
 
   final ScrollController _scrollController = ScrollController();
-
-  // 地圖相關
   final mapController = MapController();
 
   List<dynamic> get currentPageItems {
@@ -44,10 +44,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     return cyclingroutes.sublist(start, end);
   }
 
-  // keyword
+  // Controllers
   final TextEditingController keywordController = TextEditingController();
-
-  // 新增/修改資料
   final TextEditingController nameController = TextEditingController();
   final TextEditingController alternateNamesController = TextEditingController();
   final TextEditingController startController = TextEditingController();
@@ -55,13 +53,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
   final TextEditingController lengthController = TextEditingController();
   final TextEditingController finishDateController = TextEditingController();
   final TextEditingController managementIdController = TextEditingController();
-
-  // 方向選擇
-  String? selectedDirection;
-
-  // 點座標 (詳細模式使用)
   final TextEditingController coordinateLngController = TextEditingController();
   final TextEditingController coordinateLatController = TextEditingController();
+
+  String? selectedDirection;
 
   @override
   void initState() {
@@ -106,7 +101,93 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     }
   }
 
-  // 確認是否有 Management
+  // 根據城市名稱和鄉鎮名稱搜尋 TownID
+  Future<int?> searchTownId(String cityName, String townName) async {
+    try {
+      final encodedCityName = Uri.encodeComponent(cityName);
+      final encodedTownName = Uri.encodeComponent(townName);
+      final response = await http.get(
+          Uri.parse('$baseUrl/town/searchTownId?cityname=$encodedCityName&townname=$encodedTownName')
+      );
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        if (result.isNotEmpty) {
+          return result[0]['TownID'];
+        }
+      }
+    } catch (e) {
+      print('搜尋 TownID 錯誤: $e');
+    }
+    return null;
+  }
+
+  // 判斷座標點是否在指定的地區內
+  Future<Map<String, String>?> getLocationFromCoordinates(double lat, double lng) async {
+    try {
+      final url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1&accept-language=zh-TW';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'User-Agent': 'Flutter App'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['address'] != null) {
+          final address = data['address'];
+          String? cityName;
+          String? townName;
+
+          // 提取城市和鄉鎮資訊
+          if (address['city'] != null) {
+            cityName = address['city'];
+          } else if (address['county'] != null) {
+            cityName = address['county'];
+          } else if (address['state'] != null) {
+            cityName = address['state'];
+          }
+
+          if (address['suburb'] != null) {
+            townName = address['suburb'];
+          } else if (address['town'] != null) {
+            townName = address['town'];
+          } else if (address['village'] != null) {
+            townName = address['village'];
+          }
+
+          if (cityName != null && townName != null) {
+            return {'cityName': cityName, 'townName': townName};
+          }
+        }
+      }
+    } catch (e) {
+      print('取得地址錯誤: $e');
+    }
+    return null;
+  }
+
+  // 檢查新座標點是否已存在於路線分區列表中
+  Future<void> checkAndAddRouteArea(double lat, double lng) async {
+    final location = await getLocationFromCoordinates(lat, lng);
+    if (location != null) {
+      final cityName = location['cityName']!;
+      final townName = location['townName']!;
+
+      // 檢查是否已存在
+      bool exists = routeAreas.any((area) =>
+      area['cityName'] == cityName && area['townName'] == townName
+      );
+
+      if (!exists) {
+        setState(() {
+          routeAreas.add({'cityName': cityName, 'townName': townName});
+        });
+      }
+    }
+  }
+
   Future<int?> checkOrCreateManagement(String name) async {
     final encodedName = Uri.encodeComponent(name);
     final checkUrl = Uri.parse('$baseUrl/management?name=$encodedName');
@@ -130,9 +211,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     return null;
   }
 
-  // 計算兩點間距離（公尺）
   double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371000; // 地球半徑（公尺）
+    const R = 6371000;
     final dLat = _deg2rad(lat2 - lat1);
     final dLon = _deg2rad(lon2 - lon1);
     final a = sin(dLat / 2) * sin(dLat / 2) +
@@ -146,10 +226,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     return deg * (pi / 180);
   }
 
-  // 反向地理編碼：將經緯度轉換為地址
   Future<String> _getAddressFromCoordinates(double lat, double lng) async {
     try {
-      // 使用 Nominatim OpenStreetMap API 進行反向地理編碼
       final url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lng&zoom=18&addressdetails=1&accept-language=zh-TW';
 
       final response = await http.get(
@@ -161,15 +239,12 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
         final data = jsonDecode(response.body);
 
         if (data['display_name'] != null) {
-          // 提取並格式化地址
           String address = data['display_name'];
 
-          // 如果有結構化地址資料，優先使用
           if (data['address'] != null) {
             final addr = data['address'];
             List<String> addressParts = [];
 
-            // 按台灣地址格式組合
             if (addr['suburb'] != null) addressParts.add(addr['suburb']);
             if (addr['road'] != null) addressParts.add(addr['road']);
             if (addr['house_number'] != null) addressParts.add(addr['house_number']);
@@ -186,51 +261,44 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       print('反向地理編碼錯誤: $e');
     }
 
-    // 如果無法取得地址，回傳座標
     return '${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)}';
   }
 
-  // 計算總路線長度
   double _calculateTotalLength() {
     if (coordinates.length < 2) return 0;
 
     double totalLength = 0;
     for (int i = 0; i < coordinates.length - 1; i++) {
       totalLength += _calculateDistance(
-        coordinates[i][1], // lat
-        coordinates[i][0], // lng
-        coordinates[i + 1][1], // lat
-        coordinates[i + 1][0], // lng
+        coordinates[i][1],
+        coordinates[i][0],
+        coordinates[i + 1][1],
+        coordinates[i + 1][0],
       );
     }
     return totalLength;
   }
 
-  // 更新起點、終點和長度
   Future<void> _updateRouteInfo() async {
     if (coordinates.isNotEmpty) {
       setState(() {
         isLoadingAddress = true;
       });
 
-      // 更新長度
       lengthController.text = _calculateTotalLength().round().toString();
 
       try {
-        // 更新起點地址（第一個點）
         final startLat = coordinates.first[1];
         final startLng = coordinates.first[0];
         final startAddress = await _getAddressFromCoordinates(startLat, startLng);
         startController.text = startAddress;
 
-        // 更新終點地址（最後一個點）
         if (coordinates.length > 1) {
           final endLat = coordinates.last[1];
           final endLng = coordinates.last[0];
           final endAddress = await _getAddressFromCoordinates(endLat, endLng);
           endController.text = endAddress;
         } else {
-          // 如果只有一個點，終點和起點相同
           endController.text = startController.text;
         }
       } catch (e) {
@@ -243,44 +311,45 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     }
   }
 
-  void _addCoordinate() {
+  void _addCoordinate() async {
     final lng = double.tryParse(coordinateLngController.text);
     final lat = double.tryParse(coordinateLatController.text);
     if (lng != null && lat != null) {
+      await checkAndAddRouteArea(lat, lng);
       setState(() {
         coordinates.add([lng, lat]);
         coordinateLngController.clear();
         coordinateLatController.clear();
       });
-      _updateRouteInfo(); // 更新路線資訊
+      _updateRouteInfo();
     }
   }
 
-  // 地圖點擊添加座標（簡易模式）
-  void _addCoordinateFromMap(LatLng point) {
+  void _addCoordinateFromMap(LatLng point) async {
+    await checkAndAddRouteArea(point.latitude, point.longitude);
     setState(() {
       coordinates.add([point.longitude, point.latitude]);
     });
-    _updateRouteInfo(); // 更新路線資訊
+    _updateRouteInfo();
   }
 
   void _removeCoordinate(int index) {
     setState(() {
       coordinates.removeAt(index);
     });
-    _updateRouteInfo(); // 更新路線資訊
+    _updateRouteInfo();
   }
 
   void _clearCoordinates() {
     setState(() {
       coordinates.clear();
+      routeAreas.clear();
       startController.clear();
       endController.clear();
       lengthController.clear();
     });
   }
 
-  // 日期選擇器
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -295,7 +364,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     }
   }
 
-  // 自行車道標記
   Widget _cyclingrouteMarkers() {
     return MarkerLayer(
       markers: coordinates.asMap().entries.map((entry) {
@@ -308,7 +376,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
           height: 60,
           child: GestureDetector(
             onTap: () {
-              // 可以在這裡加點擊標記的邏輯，例如刪除該點
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -341,7 +408,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  // 自行車道路線
   Widget _cyclingroutePolylines() {
     if (coordinates.length < 2) return Container();
 
@@ -356,7 +422,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  // 地圖Widget
   Widget _cyclingrouteMap() {
     return SizedBox(
       height: 300,
@@ -442,12 +507,19 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       setState(() {
         coordinates = parsed;
       });
-      _updateRouteInfo(); // 載入座標後更新路線資訊
+      _updateRouteInfo();
     }
   }
 
-  // 新增 cyclingroutes
+  // 新增多筆路線資料 (支援跨區)
   Future<void> _submitInsert() async {
+    if (routeAreas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('請至少新增一個座標點')),
+      );
+      return;
+    }
+
     final managementName = managementIdController.text.trim();
     int? managementID;
 
@@ -461,60 +533,70 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       }
     }
 
-    final body = {
-      'CityID': selectedCity,
-      'TownID': selectedTown,
-      'Name': nameController.text,
-      'AlternateNames': alternateNamesController.text,
-      'Start': startController.text,
-      'End': endController.text,
-      'Length': double.tryParse(lengthController.text),
-      'Direction': selectedDirection ?? '',
-      'FinishDate': finishDateController.text,
-      'ManagementID': managementID,
-    };
+    // 將路線分區轉換為 TownID
+    List<int?> townIds = [];
+    for (final area in routeAreas) {
+      final townId = await searchTownId(area['cityName']!, area['townName']!);
+      townIds.add(townId);
+    }
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/cyclingroute/insertCyclingroute'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    // 為每個分區新增路線資料
+    for (int i = 0; i < townIds.length; i++) {
+      final townId = townIds[i];
+      final body = {
+        'TownID': townId,
+        'Name': nameController.text,
+        'AlternateNames': alternateNamesController.text,
+        'Start': startController.text,
+        'End': endController.text,
+        'Length': double.tryParse(lengthController.text),
+        'Direction': selectedDirection ?? '',
+        'FinishDate': finishDateController.text,
+        'ManagementID': managementID,
+        'isChange': townId != null ? 1 : 0, // 根據 TownID 設置 isChange
+      };
 
-    if (response.statusCode == 200) {
-      final res = jsonDecode(response.body);
-      final insertedId = res['insertedId'];
+      final response = await http.post(
+        Uri.parse('$baseUrl/cyclingroute/insertCyclingroute'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
 
-      // 插入座標點資料到 cyclingroute_point 表
-      for (final coord in coordinates) {
-        final lng = double.tryParse(coord[0].toString());
-        final lat = double.tryParse(coord[1].toString());
+      if (response.statusCode == 200) {
+        final res = jsonDecode(response.body);
+        final insertedId = res['insertedId'];
 
-        if (lng != null && lat != null) {
-          await http.post(
-            Uri.parse('$baseUrl/points/insertPoint'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'CRID': insertedId,
-              'Longitude': lng,
-              'Latitude': lat,
-            }),
-          );
-        } else {
-          print('轉換失敗，輸入不是數字: lng=$lng, lat=$lat');
+        // 插入座標點資料 (只在第一筆資料時插入)
+        if (i == 0) {
+          for (final coord in coordinates) {
+            final lng = double.tryParse(coord[0].toString());
+            final lat = double.tryParse(coord[1].toString());
+
+            if (lng != null && lat != null) {
+              await http.post(
+                Uri.parse('$baseUrl/points/insertPoint'),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'CRID': insertedId,
+                  'Longitude': lng,
+                  'Latitude': lat,
+                }),
+              );
+            }
+          }
         }
       }
-
-      await fetchCyclingroutes();
-      _clearForm();
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
     }
+
+    await fetchCyclingroutes();
+    _clearForm();
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
-  // 編輯 cyclingroutes
   Future<void> _submitUpdate() async {
     print("_submitUpdate(): $editingCRID");
     if (editingCRID == null) return;
@@ -532,9 +614,8 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       }
     }
 
+    // 更新時使用原本的 TownID (不跨區更新)
     final body = {
-      'CityID': selectedCity,
-      'TownID': selectedTown,
       'Name': nameController.text,
       'AlternateNames': alternateNamesController.text,
       'Start': startController.text,
@@ -551,7 +632,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
       body: jsonEncode(body),
     );
 
-    // 同步座標資料到 cyclingroute_point 表
     await _syncCoordinatesWithServer(editingCRID ?? 0);
 
     if (response.statusCode == 200) {
@@ -566,7 +646,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     }
   }
 
-  // 刪除 cyclingroutes
   Future<void> _deleteCyclingroute(int crid) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/cyclingroute/deleteCyclingroute/$crid'),
@@ -617,7 +696,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  // 方向選擇Widget
   Widget _buildDirectionDropdown() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
@@ -663,45 +741,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  // 簡易模式表單
   Widget _simpleForm() {
     return Column(
       children: [
         const Divider(height: 32, thickness: 1),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            DropdownButton<int>(
-              value: selectedCity,
-              hint: const Text('選擇城市'),
-              onChanged: (value) {
-                setState(() {
-                  selectedCity = value;
-                  selectedTown = null;
-                  fetchTowns();
-                });
-              },
-              items: cities.map<DropdownMenuItem<int>>((city) {
-                return DropdownMenuItem<int>(
-                  value: city['CityID'],
-                  child: Text(city['CityName']),
-                );
-              }).toList(),
-            ),
-            const SizedBox(width: 20),
-            DropdownButton<int>(
-              value: selectedTown,
-              hint: const Text('選擇鄉鎮'),
-              onChanged: (value) => setState(() => selectedTown = value),
-              items: towns.map<DropdownMenuItem<int>>((town) {
-                return DropdownMenuItem<int>(
-                  value: town['TownID'],
-                  child: Text(town['TownName']),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
         _buildTextField('路線名稱', nameController),
         _buildTextField('路線別名', alternateNamesController),
         _buildDirectionDropdown(),
@@ -734,6 +777,22 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             ],
           ),
           const SizedBox(height: 8),
+
+          // 顯示路線分區資訊
+          if (routeAreas.isNotEmpty) ...[
+            const Text('路線經過區域:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: routeAreas.map((area) => Chip(
+                label: Text('${area['cityName']} ${area['townName']}'),
+                backgroundColor: Colors.blue[100],
+              )).toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
+
           if (startController.text.isNotEmpty) ...[
             Text('起點: ${startController.text}', style: const TextStyle(fontSize: 12, color: Colors.green)),
             const SizedBox(height: 4),
@@ -772,45 +831,10 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
     );
   }
 
-  // 詳細模式表單（原來的表單）
   Widget _detailedForm() {
     return Column(
       children: [
         const Divider(height: 32, thickness: 1),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            DropdownButton<int>(
-              value: selectedCity,
-              hint: const Text('選擇城市'),
-              onChanged: (value) {
-                setState(() {
-                  selectedCity = value;
-                  selectedTown = null;
-                  fetchTowns();
-                });
-              },
-              items: cities.map<DropdownMenuItem<int>>((city) {
-                return DropdownMenuItem<int>(
-                  value: city['CityID'],
-                  child: Text(city['CityName']),
-                );
-              }).toList(),
-            ),
-            const SizedBox(width: 20),
-            DropdownButton<int>(
-              value: selectedTown,
-              hint: const Text('選擇鄉鎮'),
-              onChanged: (value) => setState(() => selectedTown = value),
-              items: towns.map<DropdownMenuItem<int>>((town) {
-                return DropdownMenuItem<int>(
-                  value: town['TownID'],
-                  child: Text(town['TownName']),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
         _buildTextField('路線名稱', nameController),
         _buildTextField('路線別名', alternateNamesController),
         _buildTextField('起點', startController),
@@ -861,6 +885,22 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
             );
           },
         ),
+
+        // 顯示路線分區資訊
+        if (routeAreas.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text('路線經過區域:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: routeAreas.map((area) => Chip(
+              label: Text('${area['cityName']} ${area['townName']}'),
+              backgroundColor: Colors.blue[100],
+            )).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1019,12 +1059,6 @@ class _ManageCyclingroutePageState extends State<ManageCyclingroutePage> {
                               setState(() {
                                 editingCRID = item['CRID'];
                                 isAdding = true;
-                                selectedCity = item['CityID'];
-                                fetchTowns().then((_) {
-                                  setState(() {
-                                    selectedTown = item['TownID'];
-                                  });
-                                });
                                 nameController.text = item['Name'] ?? '';
                                 alternateNamesController.text = item['AlternateNames'] ?? '';
                                 startController.text = item['Start'] ?? '';
