@@ -9,40 +9,57 @@ router.get('/', async (req, res, next) => {
     const keyword = req.query.keyword;
 
     let sql = `
-        SELECT cyclingroute.CRID, town.CityID, city.CityName, town.TownID, town.TownName,
+        SELECT DISTINCT cyclingroute.CRID, town.CityID, city.CityName, town.TownID, town.TownName,
                management.ManagementID, management.ManagementName, cyclingroute.Name,
                cyclingroute.AlternateNames, cyclingroute.Start,
                cyclingroute.End, cyclingroute.Length, cyclingroute.Direction,
-               cyclingroute.FinishDate, cyclingroute.isChange
+               cyclingroute.FinishDate
         FROM cyclingroute
         LEFT JOIN town ON cyclingroute.TownID = town.TownID
         LEFT JOIN city ON town.CityID = city.CityID
         LEFT JOIN management ON cyclingroute.ManagementID = management.ManagementID
-        WHERE 1
     `;
     let params = [];
-
+    let whereConditions = ['1=1']; // 改用陣列來管理條件
 
     if (keyword) {
-        sql += ' AND cyclingroute.Name LIKE ?';
-        params = [`%${keyword}%`];
+        whereConditions.push('cyclingroute.Name LIKE ?');
+        params.push(`%${keyword}%`);
     } else if (crID) {
-        sql += ' AND cyclingroute.CRID = ?';
-        params = [crID];
+        whereConditions.push('cyclingroute.CRID = ?');
+        params.push(crID);
     } else if (townID) {
-        sql += ' AND cyclingroute.TownID = ?';
-        params = [townID];
+        // 修改：查詢主要路線資料或任何座標點在此鄉鎮的路線
+        sql += `
+            LEFT JOIN cyclingroute_point ON cyclingroute.CRID = cyclingroute_point.CRID
+        `;
+        whereConditions.push('(cyclingroute.TownID = ? OR cyclingroute_point.TownID = ?)');
+        params.push(townID, townID);
     } else if (cityID) {
-        sql += ' AND town.CityID = ?';
-        params = [cityID];
+        // 修改：查詢主要路線資料或任何座標點在此城市的路線
+        // 通過 town 表關聯查詢城市，或通過座標點的鄉鎮查詢城市
+        sql += `
+            LEFT JOIN cyclingroute_point ON cyclingroute.CRID = cyclingroute_point.CRID
+            LEFT JOIN town t2 ON cyclingroute_point.TownID = t2.TownID
+        `;
+        whereConditions.push('(city.CityID = ? OR t2.CityID = ?)');
+        params.push(cityID, cityID);
     }
+
+    // 組合 WHERE 條件
+    if (whereConditions.length > 0) {
+        sql += ' WHERE ' + whereConditions.join(' AND ');
+    }
+
+    // 加入排序確保結果一致性
+    sql += ' ORDER BY cyclingroute.CRID';
 
     try {
         const [routes] = await pool.promise().query(sql, params);
 
         // 查所有點
         const [points] = await pool.promise().query(
-            'SELECT CRID, Longitude, Latitude FROM cyclingroute_point'
+            'SELECT CRID, Longitude, Latitude FROM cyclingroute_point ORDER BY CRID, PointID'
         );
 
         // 將點資料依照 CRID 分組
@@ -64,10 +81,9 @@ router.get('/', async (req, res, next) => {
     }
 });
 
-// ✅ Insert cyclingroute (支援 isChange 欄位)
+// Insert cyclingroute (修正 SQL 語句的欄位數量問題)
 router.post('/insertCyclingroute', (req, res, next) => {
   const {
-    CityID,
     TownID,
     ManagementID,
     Name,
@@ -77,17 +93,16 @@ router.post('/insertCyclingroute', (req, res, next) => {
     Length,
     Direction,
     FinishDate,
-    isChange
   } = req.body;
 
   if (!Name) {
-    return res.status(400).json({ message: '缺少必要欄位' });
+    return res.status(400).json({ message: '缺少必要欄位：路線名稱' });
   }
 
   const sql = `
     INSERT INTO cyclingroute
-    (TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID, isChange)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (TownID, Name, AlternateNames, Start, End, Length, Direction, FinishDate, ManagementID)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
@@ -100,7 +115,6 @@ router.post('/insertCyclingroute', (req, res, next) => {
     Direction || null,
     FinishDate || null,
     ManagementID || null,
-    isChange !== undefined ? isChange : (TownID ? 1 : 0), // 根據 TownID 設置 isChange
   ];
 
   pool.query(sql, params, (err, result) => {
@@ -109,12 +123,10 @@ router.post('/insertCyclingroute', (req, res, next) => {
   });
 });
 
-
-// ✅ Update cyclingroute (支援 isChange 欄位)
+// Update cyclingroute (移除不需要的 CityID 參數)
 router.put('/updateCyclingroute/:crid', (req, res, next) => {
   const crid = req.params.crid;
   const {
-    CityID,
     TownID,
     ManagementID,
     Name,
@@ -124,13 +136,12 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
     Length,
     Direction,
     FinishDate,
-    isChange
   } = req.body;
 
   const sql = `
     UPDATE cyclingroute
     SET TownID = ?, Name = ?, AlternateNames = ?,
-    Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?, isChange = ?
+    Start = ?, End = ?, Length = ?, Direction = ?, FinishDate = ?, ManagementID = ?
     WHERE CRID = ?
   `;
 
@@ -144,7 +155,6 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
         Direction || null,
         FinishDate || null,
         ManagementID || null,
-        isChange !== undefined ? isChange : (TownID ? 1 : 0), // 根據 TownID 設置 isChange
         crid,
     ];
 
@@ -154,8 +164,7 @@ router.put('/updateCyclingroute/:crid', (req, res, next) => {
   });
 });
 
-
-// ✅ Delete cyclingroute
+// Delete cyclingroute
 router.delete('/deleteCyclingroute/:crid', (req, res, next) => {
   const crid = req.params.crid;
 
